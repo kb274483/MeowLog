@@ -112,6 +112,22 @@
         />
       </div>
       
+      <!-- 呼吸次數 -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          <span class="material-symbols-outlined text-lg text-gray-700 font-bold">
+            ecg_heart
+          </span>
+          呼吸次數 (次/分)
+        </label>
+        <input 
+          v-model.number="formData.respirationRate" 
+          type="number" 
+          min="0"
+          class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+        />
+      </div>
+      
       <!-- 新增每日體重欄位 -->
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -197,6 +213,7 @@ const formData = reactive({
   hasVomit: false,
   vomitCount: null,
   dailyWeight: null,
+  respirationRate: null,
   notes: '',
   mediaFiles: []
 });
@@ -215,6 +232,7 @@ const hasChanges = computed(() => {
     hasVomit: formData.hasVomit,
     vomitCount: formData.vomitCount,
     dailyWeight: formData.dailyWeight,
+    respirationRate: formData.respirationRate,
     notes: formData.notes,
     mediaFilesCount: formData.mediaFiles.length
   }) !== JSON.stringify({
@@ -226,6 +244,7 @@ const hasChanges = computed(() => {
     hasVomit: originalData.value.hasVomit,
     vomitCount: originalData.value.vomitCount,
     dailyWeight: originalData.value.dailyWeight,
+    respirationRate: originalData.value.respirationRate,
     notes: originalData.value.notes,
     mediaFilesCount: originalData.value.mediaFiles.length
   });
@@ -263,8 +282,9 @@ const loadDailyRecord = async (date) => {
       hasVomit: false,
       vomitCount: null,
       dailyWeight: null,
+      respirationRate: null,
       notes: '',
-      mediaFiles: []
+      mediaFiles: [],
     };
     
     if (recordDoc.exists()) {
@@ -375,6 +395,7 @@ const saveRecord = async () => {
       hasVomit: formData.hasVomit,
       vomitCount: formData.hasVomit ? formData.vomitCount : null,
       dailyWeight: formData.dailyWeight,
+      respirationRate: formData.respirationRate,
       notes: formData.notes || null,
       mediaFiles: cleanMediaFiles,
       updatedAt: serverTimestamp(),

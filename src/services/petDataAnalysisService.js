@@ -78,66 +78,56 @@ function formatDate(date) {
  */
 export function getMetricStats(timeSeriesData, metric) {
   // Filter out non-null values
-  const values = timeSeriesData.metrics[metric].filter(v => v !== null && v !== undefined);
+  const values = timeSeriesData.metrics[metric].filter(v => v !== null && v !== undefined && !isNaN(v));
   
   if (values.length === 0) {
     return {
+      average: null,
       min: null,
       max: null,
-      avg: null,
-      trend: 'stable',
-      dataPoints: 0
+      trend: 'stable'
     };
   }
   
   // Calculate各项统计值
+  const sum = values.reduce((a, b) => a + b, 0);
+  const average = sum / values.length;
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const sum = values.reduce((a, b) => a + b, 0);
-  const avg = parseFloat((sum / values.length).toFixed(4));
   
   // Calculate trend
   let trend = 'stable';
   if (values.length > 1) {
-    const half = Math.floor(values.length / 2);
-    // If data points are less than 4, compare first and last
-    if (values.length < 4) {
-      const first = values[0];
-      const last = values[values.length - 1];
-      // Avoid division by zero error
-      if (first !== 0) {
-        const change = ((last - first) / Math.abs(first)) * 100;
-        if (change > 5) trend = 'increasing';
-        else if (change < -5) trend = 'decreasing';
-      } else {
-        if (last > 0) trend = 'increasing';
-        else if (last < 0) trend = 'decreasing';
-      }
-    } else {
-      const firstHalf = values.slice(0, half);
-      const secondHalf = values.slice(half);
-      
-      const firstHalfAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
-      const secondHalfAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
-      
-      // Avoid division by zero error
-      if (firstHalfAvg !== 0) {
-        const change = ((secondHalfAvg - firstHalfAvg) / Math.abs(firstHalfAvg)) * 100;
-        if (change > 5) trend = 'increasing';
-        else if (change < -5) trend = 'decreasing';
-      } else {
-        if (secondHalfAvg > 0) trend = 'increasing';
-        else if (secondHalfAvg < 0) trend = 'decreasing';
-      }
+    const firstHalf = values.slice(0, Math.floor(values.length / 2));
+    const secondHalf = values.slice(Math.floor(values.length / 2));
+    
+    const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+    const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+    
+    const threshold = (max - min) * 0.05; // 5% 的變化
+    
+    if (secondAvg - firstAvg > threshold) {
+      trend = 'increasing';
+    } else if (firstAvg - secondAvg > threshold) {
+      trend = 'decreasing';
     }
   }
   
+  // 針對不同指標格式化平均值
+  let formattedAverage;
+  if (metric === 'weight') {
+    formattedAverage = parseFloat(average.toFixed(2));
+  } else if (metric === 'respiration') {
+    formattedAverage = Math.round(average);
+  } else {
+    formattedAverage = Math.round(average);
+  }
+  
   return {
+    average: formattedAverage,
     min,
     max,
-    avg,
-    trend,
-    dataPoints: values.length
+    trend
   };
 }
 

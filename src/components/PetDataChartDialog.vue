@@ -163,7 +163,8 @@ const chartInstance = ref(null);
 const metricOptions = [
   { label: '體重', value: 'dailyWeight', unit: 'kg' },
   { label: '飲食量', value: 'foodAmount', unit: 'g' },
-  { label: '飲水量', value: 'waterAmount', unit: 'ml' }
+  { label: '飲水量', value: 'waterAmount', unit: 'ml' },
+  { label: '呼吸次數', value: 'respirationRate', unit: '次/分' }
 ];
 
 const timeRangeOptions = [

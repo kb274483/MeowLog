@@ -67,7 +67,7 @@
       <!-- 飲水次數 -->
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">
-          <q-icon name="water_full" size="16px" class="mr-1" />
+          <q-icon name="local_drink" size="16px" class="mr-1" />
           飲水次數
         </label>
         <input 
@@ -96,7 +96,7 @@
       <div>
         <div class="flex items-center mb-1">
           <label class="block text-sm font-medium text-gray-700 mr-3">
-            <q-icon name="sentiment_stressed" size="16px" class="mr-1" />
+            <q-icon name="sick" size="16px" class="mr-1" />
             是否嘔吐
           </label>
           <q-toggle v-model="formData.hasVomit" color="amber" />

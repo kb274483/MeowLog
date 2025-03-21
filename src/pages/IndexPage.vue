@@ -48,7 +48,7 @@
 
 
     <div v-else class="max-w-4xl mx-auto">
-      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="bg-white rounded-lg shadow-md p-4 pt-2 mb-6">
         <div class="flex justify-between items-center mb-4">
           <h1 class="text-2xl font-bold text-amber-600">{{ userStore.family.name }}</h1>
           <div class="flex items-center">

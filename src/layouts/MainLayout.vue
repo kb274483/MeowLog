@@ -10,7 +10,7 @@
       </q-toolbar>
     </q-header>
 
-    <q-page-container style="padding-top: 64px;">
+    <q-page-container>
       <router-view />
     </q-page-container>
     

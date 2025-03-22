@@ -6,7 +6,7 @@
       class="fixed inset-0 z-50 bg-black/70 flex flex-col items-center justify-center"
     >
       <div class="bg-white rounded-lg p-6 max-w-sm w-4/5 text-center">
-        <q-spinner-dots size="60px" color="amber" class="mb-4" />
+        <q-spinner-dots size="60px" color="amber" class="mb-4 mx-auto" />
         <h3 class="text-lg font-medium text-gray-800 mb-2">還在上傳...</h3>
         <p class="text-sm text-gray-600 mb-4">請不要關閉或離開頁面</p>
         <div class="w-full bg-gray-200 rounded-full h-4">
@@ -233,176 +233,54 @@ const closeFullscreen = () => {
 };
 
 // improve HEIC processing logic
-const handleFileChange = async (event) => {
-  const files = Array.from(event.target.files || []);
-  if (!files.length) return;
+const handleFileChange = (event) => {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
   
-  // create a copy of the current file list
-  const updatedFiles = [...props.modelValue];
-  let heic2any;
+  console.log(`選擇了 ${files.length} 個文件`);
   
-  try {
-    // dynamically import HEIC conversion library
-    heic2any = (await import('heic2any')).default;
-  } catch (error) {
-    console.error('Error loading HEIC conversion library:', error);
+  // 檢查檔案類型
+  const invalidFiles = Array.from(files).filter(file => {
+    const fileType = file.type.toLowerCase();
+    return !(fileType.startsWith('image/') || fileType.startsWith('video/'));
+  });
+  
+  if (invalidFiles.length > 0) {
+    notification.error('請選擇圖片或影片文件');
+    return;
   }
   
-  for (const file of files) {
-    try {
-      // check if it's HEIC/HEIF format
-      const isHeic = file.name.toLowerCase().endsWith('.heic') || 
-                    file.name.toLowerCase().endsWith('.heif') ||
-                    file.type === 'image/heic' || 
-                    file.type === 'image/heif';
-      
-      // add file with loading state first
-      const fileIndex = updatedFiles.length;
-      const initialFileState = {
-        type: isHeic ? 'image' : (file.type.startsWith('image/') ? 'image' : 
-                              file.type.startsWith('video/') ? 'video' : 'unknown'),
-        name: file.name,
-        size: file.size,
-        loading: true,
-        loadError: false,
-        isHeic,
-        isNew: true,
-        // add original file reference but not make it a reactive object
-        _file: file
-      };
-      
-      updatedFiles.push(initialFileState);
-      
-      // immediately update model value to show loading state
-      emit('update:modelValue', [...updatedFiles]);
-      
-      // process file in next microtask to avoid Vue reactive system issues
-      await nextTick();
-      
-      // process HEIC file (if conversion library is available)
-      if (isHeic && heic2any) {
-        try {
-          notification.info('處理HEIC格式圖片中，請等等...');
-          
-          // convert to JPEG
-          const blob = await heic2any({
-            blob: file,
-            toType: 'image/jpeg',
-            quality: 0.8
-          });
-          
-          // create new File object
-          const processedFile = new File(
-            [blob], 
-            file.name.replace(/\.(heic|heif)$/i, '.jpg'),
-            { type: 'image/jpeg' }
-          );
-          
-          // create preview URL
-          const previewUrl = URL.createObjectURL(processedFile);
-          objectUrls.value.push(previewUrl);
-          
-          // update file information
-          const updatedFile = {
-            file: processedFile,
-            type: 'image',
-            name: processedFile.name,
-            size: processedFile.size,
-            url: null,
-            previewUrl,
-            loading: false,
-            loadError: false,
-            isHeic: false,
-            isNew: true,
-            wasHeic: true
-          };
-          
-          // update array using index
-          updatedFiles[fileIndex] = updatedFile;
-          
-          notification.success('HEIC格式圖片處理成功');
-        } catch (error) {
-          console.error('HEIC 轉換失敗:', error);
-          
-          // mark as load error
-          updatedFiles[fileIndex] = {
-            type: 'image',
-            name: file.name,
-            size: file.size,
-            loading: false,
-            loadError: true,
-            isHeic: true,
-            isNew: true,
-            error: '無法處理HEIC格式'
-          };
-          
-          notification.error('無法處理HEIC格式圖片，請嘗試轉換為JPG後再上傳');
-        }
-      } else if (file.type.startsWith('image/')) {
-        // process regular image
-        const previewUrl = URL.createObjectURL(file);
-        objectUrls.value.push(previewUrl);
-        
-        updatedFiles[fileIndex] = {
-          file,
-          type: 'image',
-          name: file.name,
-          size: file.size,
-          url: null,
-          previewUrl,
-          loading: false,
-          loadError: false,
-          isNew: true
-        };
-      } else if (file.type.startsWith('video/')) {
-        // process video
-        updatedFiles[fileIndex] = {
-          file,
-          type: 'video',
-          name: file.name,
-          size: file.size,
-          url: null,
-          loading: false,
-          loadError: false,
-          isNew: true
-        };
-      } else {
-        // unsupported format
-        notification.warning(`不支援的檔案類型: ${file.type || '未知類型'}`);
-        
-        updatedFiles[fileIndex] = {
-          type: 'unknown',
-          name: file.name,
-          size: file.size,
-          loading: false,
-          loadError: true,
-          isNew: true,
-          error: '不支援的檔案類型'
-        };
-      }
-    } catch (error) {
-      console.error('處理文件時發生錯誤:', error, file);
-      // add a file with error state to ensure user knows there's an issue
-      updatedFiles.push({
-        type: 'unknown',
-        name: file.name || '未知文件',
-        size: file.size || 0,
-        loading: false,
-        loadError: true,
-        isNew: true,
-        error: '處理文件時出錯'
-      });
-    }
+  // 將檔案轉換為預覽格式
+  const newMediaFiles = Array.from(files).map(file => {
+    console.log('處理文件:', file.name, file.type, file.size);
+    
+    // 創建一個URL用於預覽
+    const previewURL = URL.createObjectURL(file);
+    
+    return {
+      isNew: true,
+      file: file, // 確保存儲原始文件對象
+      url: previewURL,
+      type: file.type.startsWith('video/') ? 'video' : 'image',
+      name: file.name,
+      loading: false,
+      loadError: false,
+      timestamp: Date.now()
+    };
+  });
+  
+  console.log('創建的新媒體文件:', newMediaFiles);
+  
+  // 更新modelValue
+  emit('update:modelValue', [...props.modelValue, ...newMediaFiles]);
+  
+  // 重置input以允許再次選擇相同的文件
+  if (fileInput.value) {
+    fileInput.value.value = '';
   }
   
-  // reset file input
-  fileInput.value.value = '';
-  
-  // update model value with new array, avoid directly modifying reactive object
-  emit('update:modelValue', [...updatedFiles]);
-  
-  // notify parent component that files have been added
-  emit('file-change', updatedFiles);
+  // 通知父元件文件已變更
+  emit('file-change', newMediaFiles);
 };
 
 // improve image load error handling

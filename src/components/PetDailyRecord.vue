@@ -36,60 +36,64 @@
         </select>
       </div>
       
+      <div class="grid grid-cols-2 gap-4 mb-2">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">    
+            <q-icon name="dining" size="16px" class="mr-1" />
+            飲食次數
+          </label>
+          <input 
+            v-model.number="formData.foodCount" 
+            type="number" 
+            min="0"
+            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+          />
+        </div>
+        
+        <!-- 總飲食量 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            <q-icon name="restaurant" size="16px" class="mr-1" />
+            總飲食量 (g)
+          </label>
+          <input 
+            v-model.number="formData.foodAmount" 
+            type="number" 
+            min="0"
+            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+          />
+        </div>
+      </div>
       <!-- 飲食次數 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">    
-          <q-icon name="dining" size="16px" class="mr-1" />
-          飲食次數
-        </label>
-        <input 
-          v-model.number="formData.foodCount" 
-          type="number" 
-          min="0"
-          class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-        />
-      </div>
       
-      <!-- 總飲食量 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          <q-icon name="restaurant" size="16px" class="mr-1" />
-          總飲食量 (g)
-        </label>
-        <input 
-          v-model.number="formData.foodAmount" 
-          type="number" 
-          min="0"
-          class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-        />
-      </div>
-      
-      <!-- 飲水次數 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          <q-icon name="local_drink" size="16px" class="mr-1" />
-          飲水次數
-        </label>
-        <input 
-          v-model.number="formData.waterCount" 
-          type="number" 
-          min="0"
-          class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-        />
-      </div>
-      
-      <!-- 總飲水量 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          <q-icon name="water_drop" size="16px" class="mr-1" />
-          總飲水量 (ml)
-        </label>
-        <input 
-          v-model.number="formData.waterAmount" 
-          type="number" 
-          min="0"
-          class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-        />
+      <div class="grid grid-cols-2 gap-4 mb-2">
+        <!-- 飲水次數 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            <q-icon name="local_drink" size="16px" class="mr-1" />
+            飲水次數
+          </label>
+          <input 
+            v-model.number="formData.waterCount" 
+            type="number" 
+            min="0"
+            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+          />
+        </div>
+        
+        <!-- 總飲水量 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            <q-icon name="water_drop" size="16px" class="mr-1" />
+            總飲水量 (ml)
+          </label>
+          <input 
+            v-model.number="formData.waterAmount" 
+            type="number" 
+            min="0"
+            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+          />
+        </div>
       </div>
       
       <!-- 嘔吐 -->
@@ -132,7 +136,7 @@
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">
           <q-icon name="monitor_weight" size="16px" class="mr-1" />
-          當日體重 (kg)
+          體重 (kg)
         </label>
         <div class="flex">
           <input 
@@ -371,36 +375,73 @@ const saveRecord = async () => {
     // Upload media files
     let updatedMediaFiles = [...formData.mediaFiles];
     if (hasNewFiles) {
-      updatedMediaFiles = await uploadMediaFiles(
-        formData.mediaFiles, 
-        uploadOptions, 
-        handleProgress
-      );
+      try {
+        updatedMediaFiles = await uploadMediaFiles(
+          formData.mediaFiles, 
+          uploadOptions, 
+          handleProgress
+        );
+      } catch (uploadError) {
+        console.error('媒體上傳失敗:', uploadError);
+        notification.error('部分媒體文件上傳失敗，但記錄仍會儲存');
+        // 繼續執行，但標記上傳失敗的文件
+        updatedMediaFiles = formData.mediaFiles.map(file => {
+          if (file.isNew) {
+            return { ...file, loadError: true };
+          }
+          return file;
+        });
+      }
     }
     
     // Update form data
     formData.mediaFiles = updatedMediaFiles;
-    const cleanMediaFiles = getCleanMediaFiles(formData.mediaFiles);
     
-    // Prepare record data
+    // 處理媒體文件，確保無 undefined 值
+    let cleanMediaFiles = [];
+    try {
+      cleanMediaFiles = getCleanMediaFiles(formData.mediaFiles);
+    } catch (cleanError) {
+      console.error('清理媒體文件失敗:', cleanError);
+      // 手動清理媒體文件數據
+      cleanMediaFiles = formData.mediaFiles.map(file => {
+        // 只保留必要字段，並確保沒有 undefined 值
+        const cleanFile = {
+          url: file.url || null,
+          type: file.type || 'image',
+          name: file.name || 'file',
+          timestamp: file.timestamp || Date.now()
+        };
+        return cleanFile;
+      }).filter(file => file.url); // 過濾掉沒有 URL 的文件
+    }
+    
+    // 準備記錄數據，確保所有字段都不為 undefined
     const recordData = {
       petId: props.petId,
       familyId: userStore.family.id,
       date: dateString,
       tag: formData.tag || null,
-      foodCount: formData.foodCount,
-      foodAmount: formData.foodAmount,
-      waterCount: formData.waterCount,
-      waterAmount: formData.waterAmount,
-      hasVomit: formData.hasVomit,
-      vomitCount: formData.hasVomit ? formData.vomitCount : null,
-      dailyWeight: formData.dailyWeight,
-      respirationRate: formData.respirationRate,
+      foodCount: formData.foodCount || null,
+      foodAmount: formData.foodAmount || null,
+      waterCount: formData.waterCount || null,
+      waterAmount: formData.waterAmount || null,
+      hasVomit: formData.hasVomit || false,
+      vomitCount: formData.hasVomit ? (formData.vomitCount || 1) : null,
+      dailyWeight: formData.dailyWeight || null,
+      respirationRate: formData.respirationRate || null,
       notes: formData.notes || null,
-      mediaFiles: cleanMediaFiles,
+      mediaFiles: cleanMediaFiles || [],
       updatedAt: serverTimestamp(),
       updatedBy: userStore.user.uid
     };
+    
+    // 最後檢查，確保沒有 undefined 值
+    Object.keys(recordData).forEach(key => {
+      if (recordData[key] === undefined) {
+        recordData[key] = null;
+      }
+    });
     
     // Save to Firestore
     await setDoc(doc(db, 'petDailyRecords', recordId), recordData);
@@ -456,5 +497,15 @@ const updatePetWeight = async (weight) => {
   } catch (error) {
     console.error('更新寵物體重失敗:', error);
   }
+};
+
+// 在 PetDailyRecord.vue 中添加 handleFileChange 函數（如果尚未存在）
+const handleFileChange = (newFiles) => {
+  console.log('收到新文件:', newFiles);
+  
+  // 如果需要進行額外處理，可以在這裡添加
+  // 例如，檢查文件大小、限制上傳數量等
+  
+  // 這個函數主要用於除錯，實際上 v-model 已經處理了文件更新
 };
 </script> 

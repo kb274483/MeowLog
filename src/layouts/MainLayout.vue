@@ -1,6 +1,6 @@
 <template>
   <q-layout view="lHh Lpr lFf">
-    <q-header elevated class="bg-amber-600/70">
+    <q-header elevated class="bg-[#F59E0B]">
       <q-toolbar>
         <q-icon name="pets" class="text-3xl text-white" />
 

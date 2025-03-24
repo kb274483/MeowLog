@@ -1,13 +1,13 @@
 <template>
-  <div class="bg-gray-50 min-h-screen">
+  <div class="bg-gray-50 min-h-screen relative">
     <!-- Header -->
-    <div class="bg-white shadow-sm px-4 py-3 flex items-center">
-      
+    <div 
+      class="bg-white shadow-sm py-2 flex items-center fixed left-0 right-0 z-20" style="top: 50px;">
       <button 
         @click="goBack" 
-        class="mr-4 p-2 hover:bg-gray-100 rounded-full text-gray-700 transition-colors"
+        class="mr-4 p-4 hover:bg-gray-100 rounded-full text-gray-700 transition-colors"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
@@ -58,7 +58,7 @@
       </div>
     </div>
     
-    <div v-else class="container mx-auto p-4">
+    <div v-else class="container mx-auto p-4" style="padding-top: 94px;">
       <div 
         class="bg-white rounded-lg shadow-md p-2 mb-4 cursor-pointer hover:bg-amber-50 transition-colors"
         @click="showDataChart = true"

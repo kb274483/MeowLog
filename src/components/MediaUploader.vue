@@ -43,7 +43,7 @@
     >
       <!-- close -->
       <button 
-        class="absolute top-4 right-4 text-white bg-black/50 rounded-full w-10 h-10 flex items-center justify-center"
+        class="absolute top-16 right-4 text-white bg-black/50 rounded-full w-10 h-10 flex items-center justify-center"
         @click.stop="closeFullscreen"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -144,7 +144,7 @@
               <div v-if="hasNotes(day)" class="w-2 h-2 rounded-full bg-blue-500"></div>
             </div>
 
-            <!-- 日期內容信息 -->
+            <!-- 日期內容 -->
             <div class="text-xs text-gray-500 mt-1 flex flex-col">
               <!-- 嘔吐標記 -->
               <span v-if="hasVomit(day)" class="inline-block px-1 py-0.5 rounded bg-red-100 text-red-800 text-[10px] mb-0.5 truncate">

@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-// 創建一個響應式狀態來存儲通知數據
+
 const state = reactive({
   show: false,
   type: 'info',
@@ -11,9 +11,9 @@ const state = reactive({
   duration: 3000
 })
 
-// 通知服務
+// 通知
 const notification = {
-  // 顯示通知
+  // 顯示
   show(options) {
     Object.assign(state, {
       show: true,
@@ -27,12 +27,12 @@ const notification = {
     })
   },
   
-  // 關閉通知
+  // 關閉
   close() {
     state.show = false
   },
   
-  // 成功通知
+  // Success
   success(message, options = {}) {
     this.show({
       type: 'success',
@@ -42,7 +42,7 @@ const notification = {
     })
   },
   
-  // 錯誤通知
+  // Error
   error(message, options = {}) {
     this.show({
       type: 'error',
@@ -52,17 +52,17 @@ const notification = {
     })
   },
   
-  // 信息通知
+  // Info
   info(message, options = {}) {
     this.show({
       type: 'info',
-      title: '信息',
+      title: '資訊',
       message,
       ...options
     })
   },
   
-  // 警告通知
+  // Warning
   warning(message, options = {}) {
     this.show({
       type: 'warning',
@@ -73,5 +73,4 @@ const notification = {
   }
 }
 
-// 導出狀態和服務
 export { state, notification } 

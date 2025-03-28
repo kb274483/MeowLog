@@ -12,26 +12,23 @@ import {
  * @returns {Promise<string>} - URL of uploaded file
  */
 export const uploadMediaFile = async (file, options) => {
-  console.log('準備上傳文件:', file);
   
   try {
     // 檢查文件對象是否有效
     if (!file) {
-      console.error('文件對象為空');
-      throw new Error('無效的文件對象: 文件對象為空');
+      throw new Error('invalid file');
     }
     
-    // 檢查文件類型和大小，但不要過於嚴格
+    // 檢查文件類型和大小
     // 只需確保基本屬性存在
     if (!file.name) {
-      console.warn('文件名稱缺失，使用預設值');
       file.name = `file_${Date.now()}.jpg`;
     }
     
     // 構建存儲路徑
     const { familyId, petId, dateString } = options;
     if (!familyId || !petId) {
-      throw new Error('缺少必要的上傳信息');
+      throw new Error('Missing upload information');
     }
     
     const storagePathPrefix = `families/${familyId}/pets/${petId}/records/${dateString}`;
@@ -48,7 +45,7 @@ export const uploadMediaFile = async (file, options) => {
       // 首先嘗試直接上傳
       uploadTask = uploadBytesResumable(fileRef, file);
     } catch (uploadError) {
-      console.warn('直接上傳失敗，嘗試讀取文件內容:', uploadError);
+      console.warn('Upload failed, trying to read file content:', uploadError);
       
       // 如果直接上傳失敗，嘗試使用 FileReader 讀取文件內容再上傳
       const fileData = await new Promise((resolve, reject) => {
@@ -67,7 +64,7 @@ export const uploadMediaFile = async (file, options) => {
         'state_changed',
         () => {},
         (error) => {
-          console.error('文件上傳失敗:', error);
+          console.error('Upload failed:', error);
           reject(error);
         },
         async () => {
@@ -76,14 +73,14 @@ export const uploadMediaFile = async (file, options) => {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             resolve(downloadURL);
           } catch (urlError) {
-            console.error('獲取下載 URL 失敗:', urlError);
+            console.error('Failed to get download URL:', urlError);
             reject(urlError);
           }
         }
       );
     });
   } catch (error) {
-    console.error('上傳處理失敗:', error);
+    console.error('Upload processing failed:', error);
     throw error;
   }
 };
@@ -101,9 +98,6 @@ export const uploadMediaFiles = async (mediaFiles, uploadOptions, progressCallba
   const filesToUpload = mediaFiles.filter(file => file.isNew && file.file);
   const existingFiles = mediaFiles.filter(file => !file.isNew);
   
-  console.log('需要上傳的文件數量:', filesToUpload.length);
-  console.log('現有文件數量:', existingFiles.length);
-  
   // 如果沒有需要上傳的文件，直接返回原列表
   if (filesToUpload.length === 0) {
     return mediaFiles;
@@ -116,16 +110,11 @@ export const uploadMediaFiles = async (mediaFiles, uploadOptions, progressCallba
   // 處理每個需要上傳的文件
   for (const file of filesToUpload) {
     try {
-      console.log('正在上傳文件:', file.name || '未命名文件');
-      
       // 確保文件物件存在且有效
       if (!file.file) {
         throw new Error('文件物件缺失');
       }
-      
       const downloadURL = await uploadMediaFile(file.file, uploadOptions);
-      
-      console.log('文件上傳成功，URL:', downloadURL);
       
       updatedFiles.push({
         url: downloadURL,
@@ -139,14 +128,13 @@ export const uploadMediaFiles = async (mediaFiles, uploadOptions, progressCallba
         progressCallback(Math.round((uploadedCount / totalFiles) * 100));
       }
     } catch (error) {
-      console.error('媒體上傳失敗:', error);
+      console.error('Media upload failed:', error);
       
-      // 添加一個錯誤標記，但不中斷上傳流程
       updatedFiles.push({
         ...file,
-        url: null, // 确保有一个值，即使是null
+        url: null,
         loadError: true,
-        isNew: false // 標記為非新文件，避免重複上傳
+        isNew: false
       });
     }
   }

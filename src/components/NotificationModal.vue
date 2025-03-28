@@ -126,7 +126,7 @@ const props = defineProps({
   },
   duration: {
     type: Number,
-    default: 3000
+    default: 5000
   }
 })
 
@@ -137,13 +137,13 @@ const emit = defineEmits(['close'])
 const typeClasses = computed(() => {
   switch (props.type) {
     case 'success':
-      return 'border-l-4 border-green-500'
+      return 'border-l-4 border-b-4 border-[#49897D]'
     case 'error':
-      return 'border-l-4 border-red-500'
+      return 'border-l-4 border-b-4 border-[#F4C6C7]'
     case 'info':
-      return 'border-l-4 border-blue-500'
+      return 'border-l-4 border-b-4 border-[#5BA9D9]'
     case 'warning':
-      return 'border-l-4 border-yellow-500'
+      return 'border-l-4 border-b-4 border-[#FFA340]'
     default:
       return ''
   }
@@ -197,13 +197,13 @@ const titleClass = computed(() => {
 const buttonClass = computed(() => {
   switch (props.type) {
     case 'success':
-      return 'bg-green-600 hover:bg-green-700'
+      return 'bg-[#49897D] hover:bg-[#49897DCC]'
     case 'error':
-      return 'bg-red-600 hover:bg-red-700'
+      return 'bg-[#F23535] hover:bg-[#F23535CC]'
     case 'info':
-      return 'bg-blue-600 hover:bg-blue-700'
+      return 'bg-[#5BA9D9] hover:bg-[#5BA9D9CC]'
     case 'warning':
-      return 'bg-yellow-600 hover:bg-yellow-700'
+      return 'bg-[#FFA340] hover:bg-[#FFA340CC]'
     default:
       return 'bg-gray-600 hover:bg-gray-700'
   }

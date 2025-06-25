@@ -8,6 +8,11 @@ const routes = [
         path: 'pet/:id', 
         name: 'pet-details',
         component: () => import('pages/PetDetailsPage.vue') 
+      },
+      {
+        path: 'bowl-logs',
+        name: 'bowl-logs',
+        component: () => import('pages/BowlLogsPage.vue')
       }
     ]
   },

@@ -65,6 +65,17 @@
           </div>
         </div>
         
+        <!-- 为特定家庭添加碗重记录按钮 -->
+        <div v-if="userStore.family.id === 'xZz6XqSwb9pw9BHXh4zJ'" class="mb-4">
+          <q-btn 
+            color="primary" 
+            icon="monitor_weight" 
+            label="查看飯飯記錄" 
+            @click="goToBowlLogs"
+            class="w-full bg-blue-600 hover:bg-blue-700"
+          />
+        </div>
+        
         <div class="bg-amber-50 p-4 rounded-lg border border-amber-100 mb-4">
           <div class="flex justify-between items-center">
             <div>
@@ -437,6 +448,11 @@ const selectPet = (pet) => {
   });
 }
 
+// 跳转到碗重记录页面
+const goToBowlLogs = () => {
+  router.push({ name: 'bowl-logs' });
+}
+
 // Handle leaving family
 const leaveFamily = async () => {
   isLeavingFamily.value = true;
@@ -456,5 +472,4 @@ const leaveFamily = async () => {
     showLeaveConfirm.value = false;
   }
 };
-
 </script>

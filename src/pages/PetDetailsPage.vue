@@ -151,6 +151,11 @@
                 嘔吐
               </span>
               
+              <!-- 拉肚子標記 -->
+              <span v-if="hasDiarrhea(day)" class="inline-block px-1 py-0.5 rounded bg-orange-100 text-orange-800 text-[10px] mb-0.5 truncate">
+                拉肚子
+              </span>
+              
               <!-- 標記內容 -->
               <span v-if="getDailyTag(day)" class="inline-block px-1 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] truncate">
                 {{ getDailyTag(day) }}
@@ -270,6 +275,12 @@ const hasVomit = (day) => {
   return dailyRecords[dateKey]?.hasVomit || false;
 };
 
+// check if has diarrhea
+const hasDiarrhea = (day) => {
+  const dateKey = formatDateKey(currentYear.value, currentMonth.value, day);
+  return dailyRecords[dateKey]?.hasDiarrhea || false;
+};
+
 // select date
 const selectDate = (day) => {
   selectedDay.value = day;
@@ -292,7 +303,8 @@ const handleRecordSaved = async (data) => {
     hasRecord: true,
     tag: data.tag,
     hasNotes: data.hasNotes,
-    hasVomit: data.hasVomit
+    hasVomit: data.hasVomit,
+    hasDiarrhea: data.hasDiarrhea
   };
   
   // Update pet weight
@@ -348,7 +360,8 @@ const fetchPetDailyRecords = async () => {
           hasRecord: true,
           tag: recordData.tag || null,
           hasNotes: !!recordData.notes, // To Boolean
-          hasVomit: recordData.hasVomit || false
+          hasVomit: recordData.hasVomit || false,
+          hasDiarrhea: recordData.hasDiarrhea || false
         };
       }
     });

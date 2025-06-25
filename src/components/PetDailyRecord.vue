@@ -116,6 +116,26 @@
         />
       </div>
       
+      <!-- 拉肚子 -->
+      <div>
+        <div class="flex items-center mb-1">
+          <label class="block text-sm font-medium text-gray-700 mr-3">
+            <q-icon name="wc" size="16px" class="mr-1" />
+            是否拉肚子
+          </label>
+          <q-toggle v-model="formData.hasDiarrhea" color="amber" />
+        </div>
+        
+        <input 
+          v-if="formData.hasDiarrhea"
+          v-model.number="formData.diarrheaCount" 
+          type="number" 
+          min="1"
+          placeholder="拉肚子次數"
+          class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+        />
+      </div>
+      
       <div class="grid grid-cols-2 gap-4 mb-2">
         <!-- 呼吸次數 -->
         <div>
@@ -236,6 +256,8 @@ const formData = reactive({
   waterAmount: null,
   hasVomit: false,
   vomitCount: null,
+  hasDiarrhea: false,
+  diarrheaCount: null,
   dailyWeight: null,
   respirationRate: null,
   heartRate: null,
@@ -256,6 +278,8 @@ const hasChanges = computed(() => {
     waterAmount: formData.waterAmount,
     hasVomit: formData.hasVomit,
     vomitCount: formData.vomitCount,
+    hasDiarrhea: formData.hasDiarrhea,
+    diarrheaCount: formData.diarrheaCount,
     dailyWeight: formData.dailyWeight,
     respirationRate: formData.respirationRate,
     heartRate: formData.heartRate,
@@ -269,6 +293,8 @@ const hasChanges = computed(() => {
     waterAmount: originalData.value.waterAmount,
     hasVomit: originalData.value.hasVomit,
     vomitCount: originalData.value.vomitCount,
+    hasDiarrhea: originalData.value.hasDiarrhea,
+    diarrheaCount: originalData.value.diarrheaCount,
     dailyWeight: originalData.value.dailyWeight,
     respirationRate: originalData.value.respirationRate,
     heartRate: originalData.value.heartRate,
@@ -308,6 +334,8 @@ const loadDailyRecord = async (date) => {
       waterAmount: null,
       hasVomit: false,
       vomitCount: null,
+      hasDiarrhea: false,
+      diarrheaCount: null,
       dailyWeight: null,
       respirationRate: null,
       heartRate: null,
@@ -452,6 +480,8 @@ const saveRecord = async () => {
       waterAmount: formData.waterAmount || null,
       hasVomit: formData.hasVomit || false,
       vomitCount: formData.hasVomit ? (formData.vomitCount || 1) : null,
+      hasDiarrhea: formData.hasDiarrhea || false,
+      diarrheaCount: formData.hasDiarrhea ? (formData.diarrheaCount || 1) : null,
       dailyWeight: formData.dailyWeight || null,
       respirationRate: formData.respirationRate || null,
       heartRate: formData.heartRate || null,
@@ -488,6 +518,7 @@ const saveRecord = async () => {
       tag: formData.tag || null,
       hasNotes: !!formData.notes,
       hasVomit: formData.hasVomit,
+      hasDiarrhea: formData.hasDiarrhea,
       weightUpdated: !!formData.dailyWeight
     });
     

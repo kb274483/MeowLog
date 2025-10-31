@@ -74,11 +74,11 @@
         </div>
         
         <p class="text-sm text-gray-600 mt-2">
-          查看『{{ pet.name }}』的體重、飲食和飲水量變化趨勢
+          查看『{{ pet.name }}』的體重、飲食與體溫變化趨勢
         </p>
       </div>
       <!-- Calendar -->
-      <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+      <div class="bg-white rounded-lg shadow-md p-1 mb-4">
         <div class="flex justify-between items-center mb-4">
           <button 
             @click="previousMonth" 
@@ -114,14 +114,14 @@
           <div 
             v-for="_ in firstDayOfMonth" 
             :key="`empty-${_}`" 
-            class="h-16 sm:h-24 border border-gray-100 bg-gray-50 rounded"
+            class="h-28 sm:h-36 border border-gray-100 bg-gray-50 rounded"
           ></div>
       
           <div 
             v-for="day in daysInMonth" 
             :key="day" 
-            class="min-h-20 sm:min-h-28 border rounded p-1 transition-all duration-150"
-            :class="{ 
+            class="min-h-28 sm:min-h-36 border rounded p-1 transition-all duration-150"
+            :class="{
               'bg-amber-100 border-amber-300': isToday(day),
               'border-amber-500 border-2 ring-2 ring-amber-300 shadow-md': isSelectedDay(day),
               'border-gray-200 hover:bg-amber-50': !isToday(day) && !isSelectedDay(day),
@@ -145,20 +145,28 @@
             </div>
 
             <!-- 日期內容 -->
-            <div class="text-xs text-gray-500 mt-1 flex flex-col">
+            <div class="text-xs text-gray-600 mt-1 flex flex-col gap-0.5 break-words whitespace-normal">
               <!-- 嘔吐標記 -->
-              <span v-if="hasVomit(day)" class="inline-block px-1 py-0.5 rounded bg-red-100 text-red-800 text-[10px] mb-0.5 truncate">
+              <span v-if="hasVomit(day)" class="inline-block px-1 py-0.5 rounded bg-red-100 text-red-800 text-[10px] mb-0.5">
                 嘔吐
               </span>
               
-              <!-- 拉肚子標記 -->
-              <span v-if="hasDiarrhea(day)" class="inline-block px-1 py-0.5 rounded bg-orange-100 text-orange-800 text-[10px] mb-0.5 truncate">
-                拉肚子
+              <!-- 腹瀉標記 -->
+              <span v-if="hasDiarrhea(day)" class="inline-block px-1 py-0.5 rounded bg-orange-100 text-orange-800 text-[10px] mb-0.5">
+                腹瀉
               </span>
               
               <!-- 標記內容 -->
-              <span v-if="getDailyTag(day)" class="inline-block px-1 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] truncate">
+              <span v-if="getDailyTag(day)" class="inline-block px-1 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px]">
                 {{ getDailyTag(day) }}
+              </span>
+
+              <!-- 體重/體溫摘要 -->
+              <span v-if="getDailyWeight(day)" class="inline-block px-1 py-0.5 rounded bg-gray-100 text-gray-700 text-[10px]">
+                {{ formatWeight(getDailyWeight(day)) }}kg
+              </span>
+              <span v-if="getDailyTemperature(day)" :class="['inline-block px-1 py-0.5 rounded text-[10px]', temperatureBadgeClass(day)]">
+                {{ formatTemperature(getDailyTemperature(day)) }}°C
               </span>
             </div>
           </div>
@@ -263,6 +271,36 @@ const getDailyTag = (day) => {
   return dailyRecords[dateKey]?.tag || null;
 };
 
+const getDailyWeight = (day) => {
+  const dateKey = formatDateKey(currentYear.value, currentMonth.value, day);
+  return dailyRecords[dateKey]?.dailyWeight || null;
+};
+
+const getDailyTemperature = (day) => {
+  const dateKey = formatDateKey(currentYear.value, currentMonth.value, day);
+  return dailyRecords[dateKey]?.temperature || null;
+};
+
+// 依體溫設定體溫徽章底色：>39 紅，38~39 藍，<38 綠
+const temperatureBadgeClass = (day) => {
+  const t = getDailyTemperature(day);
+  if (t === null || t === undefined) return 'bg-gray-100 text-gray-700';
+  if (t > 39) return 'bg-red-100 text-red-800';
+  if (t >= 38 && t <= 39) return 'bg-blue-100 text-blue-800';
+  return 'bg-green-100 text-green-800';
+};
+
+// 顯示用格式化
+const formatWeight = (w) => {
+  if (w === null || w === undefined) return '';
+  return Number(w).toFixed(2);
+};
+
+const formatTemperature = (t) => {
+  if (t === null || t === undefined) return '';
+  return Number(t).toFixed(1);
+};
+
 // check if has notes
 const hasNotes = (day) => {
   const dateKey = formatDateKey(currentYear.value, currentMonth.value, day);
@@ -304,7 +342,9 @@ const handleRecordSaved = async (data) => {
     tag: data.tag,
     hasNotes: data.hasNotes,
     hasVomit: data.hasVomit,
-    hasDiarrhea: data.hasDiarrhea
+    hasDiarrhea: data.hasDiarrhea,
+    dailyWeight: data.dailyWeight || null,
+    temperature: data.temperature || null
   };
   
   // Update pet weight
@@ -361,7 +401,9 @@ const fetchPetDailyRecords = async () => {
           tag: recordData.tag || null,
           hasNotes: !!recordData.notes, // To Boolean
           hasVomit: recordData.hasVomit || false,
-          hasDiarrhea: recordData.hasDiarrhea || false
+          hasDiarrhea: recordData.hasDiarrhea || false,
+          dailyWeight: recordData.dailyWeight || null,
+          temperature: recordData.temperature || null
         };
       }
     });

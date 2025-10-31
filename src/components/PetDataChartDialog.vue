@@ -56,7 +56,7 @@
           <div v-if="!loading && !indexBuilding && !hasData" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/80 z-10">
             <q-icon name="bar_chart" size="40px" color="grey" />
             <p class="text-gray-500 mt-2 text-center text-sm">沒有足夠的數據來顯示圖表</p>
-            <p class="text-gray-400 text-xs mt-1">請先在日記中記錄您寵物的體重、飲食或飲水量</p>
+            <p class="text-gray-400 text-xs mt-1">請先在日記中記錄您寵物的體重、飲食或體溫</p>
           </div>
           
           <div class="h-full w-full">
@@ -163,7 +163,7 @@ const chartInstance = ref(null);
 const metricOptions = [
   { label: '體重', value: 'dailyWeight', unit: 'kg' },
   { label: '飲食量', value: 'foodAmount', unit: 'g' },
-  { label: '飲水量', value: 'waterAmount', unit: 'ml' },
+  { label: '體溫', value: 'temperature', unit: '°C' },
   { label: '呼吸次數', value: 'respirationRate', unit: '次/分' },
   { label: '心跳次數', value: 'heartRate', unit: '次/分' }
 ];
@@ -359,6 +359,8 @@ const renderChartOnElement = (element) => {
                 let value = context.parsed.y;
                 if (selectedMetric.value.unit === 'kg') {
                   value = value.toFixed(2);
+                } else if (selectedMetric.value.unit === '°C') {
+                  value = value.toFixed(1);
                 } else {
                   value = Math.round(value);
                 }
@@ -377,6 +379,8 @@ const renderChartOnElement = (element) => {
               callback: function(value) {
                 if (selectedMetric.value.unit === 'kg') {
                   return value.toFixed(2);
+                } else if (selectedMetric.value.unit === '°C') {
+                  return Number(value).toFixed(1);
                 }
                 return Math.round(value);
               }
@@ -407,6 +411,8 @@ const formatValue = (value) => {
   let formattedValue;
   if (selectedMetric.value.unit === 'kg') {
     formattedValue = Number(value).toFixed(2);
+  } else if (selectedMetric.value.unit === '°C') {
+    formattedValue = Number(value).toFixed(1);
   } else {
     formattedValue = Math.round(value);
   }

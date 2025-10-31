@@ -1,5 +1,8 @@
 <template>
-  <div class="pet-daily-record bg-white rounded-lg shadow-md p-4 mb-4">
+  <div class="pet-daily-record relative bg-white rounded-lg shadow-md p-4 mb-4">
+    <div v-if="isSaving || isUploading" class="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+      <q-spinner-dots size="40px" color="amber" />
+    </div>
     <div class="flex justify-between items-center mb-4">
       <h3 class="text-lg font-semibold text-gray-800">
         {{ selectedDate.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }) }} 記錄
@@ -8,10 +11,11 @@
       <button 
         @click="saveRecord" 
         class="px-3 py-1.5 rounded-md text-sm font-medium text-white transition-colors"
-        :class="hasChanges ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-300 cursor-not-allowed'"
-        :disabled="!hasChanges"
+        :class="hasChanges && !isSaving ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-300 cursor-not-allowed'"
+        :disabled="!hasChanges || isSaving"
       >
-        儲存
+        <span v-if="!isSaving">儲存</span>
+        <span v-else>儲存中...</span>
       </button>
     </div>
     
@@ -66,35 +70,7 @@
       </div>
       <!-- 飲食次數 -->
       
-      <div class="grid grid-cols-2 gap-4 mb-2">
-        <!-- 飲水次數 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            <q-icon name="local_drink" size="16px" class="mr-1" />
-            飲水次數
-          </label>
-          <input 
-            v-model.number="formData.waterCount" 
-            type="number" 
-            min="0"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-          />
-        </div>
-        
-        <!-- 總飲水量 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            <q-icon name="water_drop" size="16px" class="mr-1" />
-            總飲水量 (ml)
-          </label>
-          <input 
-            v-model.number="formData.waterAmount" 
-            type="number" 
-            min="0"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-          />
-        </div>
-      </div>
+      
       
       <!-- 嘔吐 -->
       <div>
@@ -116,12 +92,12 @@
         />
       </div>
       
-      <!-- 拉肚子 -->
+      <!-- 腹瀉 -->
       <div>
         <div class="flex items-center mb-1">
           <label class="block text-sm font-medium text-gray-700 mr-3">
             <q-icon name="wc" size="16px" class="mr-1" />
-            是否拉肚子
+            是否腹瀉
           </label>
           <q-toggle v-model="formData.hasDiarrhea" color="amber" />
         </div>
@@ -131,7 +107,7 @@
           v-model.number="formData.diarrheaCount" 
           type="number" 
           min="1"
-          placeholder="拉肚子次數"
+          placeholder="腹瀉次數"
           class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
         />
       </div>
@@ -185,6 +161,24 @@
             min="0" 
             step="0.01"
             placeholder="Kg"
+            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+          />
+        </div>
+      </div>
+
+      <!-- 體溫 -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          <q-icon name="device_thermostat" size="16px" class="mr-1" />
+          體溫 (°C)
+        </label>
+        <div class="flex">
+          <input 
+            v-model.number="formData.temperature" 
+            type="number" 
+            min="0" 
+            step="0.1"
+            placeholder="°C"
             class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
           />
         </div>
@@ -244,6 +238,7 @@ const emit = defineEmits(['saved']);
 
 const userStore = useUserStore();
 const isUploading = ref(false);
+const isSaving = ref(false);
 const uploadProgress = ref(0);
 const originalData = ref(null);
 
@@ -252,8 +247,6 @@ const formData = reactive({
   tag: '',
   foodCount: null,
   foodAmount: null,
-  waterCount: null,
-  waterAmount: null,
   hasVomit: false,
   vomitCount: null,
   hasDiarrhea: false,
@@ -261,6 +254,7 @@ const formData = reactive({
   dailyWeight: null,
   respirationRate: null,
   heartRate: null,
+  temperature: null,
   notes: '',
   mediaFiles: []
 });
@@ -274,8 +268,6 @@ const hasChanges = computed(() => {
     tag: formData.tag,
     foodCount: formData.foodCount,
     foodAmount: formData.foodAmount,
-    waterCount: formData.waterCount,
-    waterAmount: formData.waterAmount,
     hasVomit: formData.hasVomit,
     vomitCount: formData.vomitCount,
     hasDiarrhea: formData.hasDiarrhea,
@@ -283,14 +275,13 @@ const hasChanges = computed(() => {
     dailyWeight: formData.dailyWeight,
     respirationRate: formData.respirationRate,
     heartRate: formData.heartRate,
+    temperature: formData.temperature,
     notes: formData.notes,
     mediaFilesCount: formData.mediaFiles.length
   }) !== JSON.stringify({
     tag: originalData.value.tag,
     foodCount: originalData.value.foodCount,
     foodAmount: originalData.value.foodAmount,
-    waterCount: originalData.value.waterCount,
-    waterAmount: originalData.value.waterAmount,
     hasVomit: originalData.value.hasVomit,
     vomitCount: originalData.value.vomitCount,
     hasDiarrhea: originalData.value.hasDiarrhea,
@@ -298,6 +289,7 @@ const hasChanges = computed(() => {
     dailyWeight: originalData.value.dailyWeight,
     respirationRate: originalData.value.respirationRate,
     heartRate: originalData.value.heartRate,
+    temperature: originalData.value.temperature,
     notes: originalData.value.notes,
     mediaFilesCount: originalData.value.mediaFiles.length
   });
@@ -330,8 +322,6 @@ const loadDailyRecord = async (date) => {
       tag: '',
       foodCount: null,
       foodAmount: null,
-      waterCount: null,
-      waterAmount: null,
       hasVomit: false,
       vomitCount: null,
       hasDiarrhea: false,
@@ -339,6 +329,7 @@ const loadDailyRecord = async (date) => {
       dailyWeight: null,
       respirationRate: null,
       heartRate: null,
+      temperature: null,
       notes: '',
       mediaFiles: [],
     };
@@ -391,6 +382,7 @@ const saveRecord = async () => {
   }
   
   try {
+    isSaving.value = true;
     // Check if there are new files to upload
     const hasNewFiles = formData.mediaFiles.some(file => file.isNew);
     
@@ -476,8 +468,6 @@ const saveRecord = async () => {
       tag: formData.tag || null,
       foodCount: formData.foodCount || null,
       foodAmount: formData.foodAmount || null,
-      waterCount: formData.waterCount || null,
-      waterAmount: formData.waterAmount || null,
       hasVomit: formData.hasVomit || false,
       vomitCount: formData.hasVomit ? (formData.vomitCount || 1) : null,
       hasDiarrhea: formData.hasDiarrhea || false,
@@ -485,6 +475,7 @@ const saveRecord = async () => {
       dailyWeight: formData.dailyWeight || null,
       respirationRate: formData.respirationRate || null,
       heartRate: formData.heartRate || null,
+      temperature: formData.temperature || null,
       notes: formData.notes || null,
       mediaFiles: cleanMediaFiles || [],
       updatedAt: serverTimestamp(),
@@ -519,7 +510,9 @@ const saveRecord = async () => {
       hasNotes: !!formData.notes,
       hasVomit: formData.hasVomit,
       hasDiarrhea: formData.hasDiarrhea,
-      weightUpdated: !!formData.dailyWeight
+      weightUpdated: !!formData.dailyWeight,
+      dailyWeight: formData.dailyWeight || null,
+      temperature: formData.temperature || null
     });
     
   } catch (error) {
@@ -533,6 +526,7 @@ const saveRecord = async () => {
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.height = '';
+      isSaving.value = false;
     }, 500);
   }
 };

@@ -52,6 +52,16 @@
         <div class="flex justify-between items-center mb-4">
           <h1 class="text-2xl font-bold text-amber-600">{{ userStore.family.name }}</h1>
           <div class="flex items-center">
+            <q-btn 
+              flat 
+              round 
+              size="sm" 
+              color="amber-9" 
+              icon="settings" 
+              class="mr-2"
+              @click="openSettings"
+              title="家庭設定"
+            />
             <p class="text-sm text-gray-500 mr-2">歡迎, {{ userStore.user.displayName }}</p>
             <q-btn 
               flat 
@@ -234,11 +244,54 @@
       :loading="isLeavingFamily"
       @confirm="leaveFamily"
     />
+
+    <!-- Family Settings Dialog -->
+    <q-dialog v-model="showSettingsDialog" persistent>
+      <q-card class="w-full max-w-md">
+        <q-card-section class="row items-center">
+          <div class="text-h6">家庭設定</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section>
+          <div class="mb-4">
+            <p class="text-sm text-gray-600 mb-2">熱量計算設定</p>
+            <q-input 
+              v-model.number="familySettings.wetFoodCalories" 
+              label="濕食熱量 (kcal / 盒或罐)" 
+              type="number"
+              dense 
+              outlined
+              class="mb-3"
+            />
+            <q-input 
+              v-model.number="familySettings.dryFoodCalories" 
+              label="乾食熱量 (kcal / g)" 
+              type="number"
+              dense 
+              outlined
+              step="0.1"
+            />
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="取消" color="grey" v-close-popup />
+          <q-btn 
+            label="儲存" 
+            color="amber-8" 
+            :loading="isSavingSettings"
+            @click="saveSettings" 
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { auth, provider, signInWithPopup } from 'src/boot/firebase'
 import { useUserStore } from 'src/stores/userStore'
 import { usePetStore } from 'src/stores/petStore'
@@ -269,6 +322,12 @@ const showEditPetDialog = ref(false)
 const selectedPet = ref(null)
 const showLeaveConfirm = ref(false)
 const isLeavingFamily = ref(false)
+const showSettingsDialog = ref(false)
+const isSavingSettings = ref(false)
+const familySettings = reactive({
+  wetFoodCalories: null,
+  dryFoodCalories: null
+})
 
 // Init auth on component mount
 onMounted(async () => {
@@ -472,4 +531,36 @@ const leaveFamily = async () => {
     showLeaveConfirm.value = false;
   }
 };
+
+// Open settings dialog
+const openSettings = () => {
+  if (userStore.family) {
+    familySettings.wetFoodCalories = userStore.family.wetFoodCalories || null
+    familySettings.dryFoodCalories = userStore.family.dryFoodCalories || null
+  }
+  showSettingsDialog.value = true
+}
+
+// Save settings
+const saveSettings = async () => {
+  isSavingSettings.value = true
+  try {
+    const success = await userStore.updateFamilySettings({
+      wetFoodCalories: familySettings.wetFoodCalories,
+      dryFoodCalories: familySettings.dryFoodCalories
+    })
+    
+    if (success) {
+      notification.success('家庭設定已更新')
+      showSettingsDialog.value = false
+    } else {
+      throw new Error('更新失敗')
+    }
+  } catch (error) {
+    console.error('更新設定失敗:', error)
+    notification.error('更新設定失敗，請重試')
+  } finally {
+    isSavingSettings.value = false
+  }
+}
 </script>

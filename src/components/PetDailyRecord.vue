@@ -24,92 +24,107 @@
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">
           <q-icon name="label" size="16px" class="mr-1" />
-          標記
+          標記 (可複選)
         </label>
-        <select 
-          v-model="formData.tag" 
-          class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-        >
-          <option value="">無</option>
-          <option value="回診">回診</option>
-          <option value="疫苗">疫苗</option>
-          <option value="驅蟲">驅蟲</option>
-          <option value="洗澡">洗澡</option>
-          <option value="美容">美容</option>
-          <option value="其他">其他</option>
-        </select>
+        <q-select 
+          v-model="formData.tags" 
+          multiple
+          :options="['回診', '疫苗', '驅蟲', '洗澡', '美容', '其他']"
+          dense
+          outlined
+          use-chips
+          class="w-full"
+        />
       </div>
       
-      <div class="grid grid-cols-2 gap-4 mb-2">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">    
-            <q-icon name="dining" size="16px" class="mr-1" />
-            飲食次數
-          </label>
-          <input 
-            v-model.number="formData.foodCount" 
-            type="number" 
-            min="0"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-          />
-        </div>
-        
-        <!-- 總飲食量 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
+      <div class="grid grid-cols-1 gap-4 mb-2">
+        <!-- 飲食記錄區塊 -->
+        <div class="bg-amber-50 p-3 rounded-lg border border-amber-100">
+          <p class="text-sm font-medium text-amber-800 mb-2 flex items-center">
             <q-icon name="restaurant" size="16px" class="mr-1" />
-            總飲食量 (g)
-          </label>
+            飲食記錄
+          </p>
+          
+          <!-- 濕食攝取量 -->
+          <div class="mb-3">
+            <label class="block text-xs font-medium text-gray-700 mb-1">
+              濕食攝取量 - {{ formData.wetFoodAmount }}/10
+            </label>
+            <div class="flex items-center">
+              <span class="text-xs text-gray-500 mr-2">0</span>
+              <input 
+                type="range" 
+                v-model.number="formData.wetFoodAmount" 
+                min="0" 
+                max="10" 
+                step="1"
+                class="w-full accent-amber-600"
+              />
+              <span class="text-xs text-gray-500 ml-2">10</span>
+            </div>
+          </div>
+
+          <!-- 乾糧攝取量 -->
+          <div class="mb-3">
+            <label class="block text-xs font-medium text-gray-700 mb-1">
+              乾糧攝取量 (g)
+            </label>
+            <input 
+              v-model.number="formData.foodAmount" 
+              type="number" 
+              min="0"
+              class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2 text-sm"
+            />
+          </div>
+
+          <!-- 熱量攝取量 -->
+          <div class="bg-white p-2 rounded border border-amber-200 flex justify-between items-center">
+            <span class="text-xs text-gray-600">總熱量攝取</span>
+            <span class="text-sm font-bold text-amber-700">{{ calculatedCalories }} kcal</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4">
+        <!-- 嘔吐 -->
+        <div>
+          <div class="flex items-center mb-1">
+            <label class="block text-sm font-medium text-gray-700 mr-3">
+              <q-icon name="sick" size="16px" class="mr-1" />
+              是否嘔吐
+            </label>
+            <q-toggle v-model="formData.hasVomit" color="amber" />
+          </div>
+          
           <input 
-            v-model.number="formData.foodAmount" 
+            v-if="formData.hasVomit"
+            v-model.number="formData.vomitCount" 
             type="number" 
-            min="0"
+            min="1"
+            placeholder="嘔吐次數"
             class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
           />
         </div>
-      </div>
-      <!-- 飲食次數 -->
-      
-      
-      
-      <!-- 嘔吐 -->
-      <div>
-        <div class="flex items-center mb-1">
-          <label class="block text-sm font-medium text-gray-700 mr-3">
-            <q-icon name="sick" size="16px" class="mr-1" />
-            是否嘔吐
-          </label>
-          <q-toggle v-model="formData.hasVomit" color="amber" />
-        </div>
         
-        <input 
-          v-if="formData.hasVomit"
-          v-model.number="formData.vomitCount" 
-          type="number" 
-          min="1"
-          placeholder="嘔吐次數"
-          class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-        />
-      </div>
-      
-      <!-- 腹瀉 -->
-      <div>
-        <div class="flex items-center mb-1">
-          <label class="block text-sm font-medium text-gray-700 mr-3">
-            <q-icon name="wc" size="16px" class="mr-1" />
-            是否腹瀉
-          </label>
-          <q-toggle v-model="formData.hasDiarrhea" color="amber" />
+        <!-- 腹瀉 -->
+        <div>
+          <div class="flex items-center mb-1">
+            <label class="block text-sm font-medium text-gray-700 mr-3">
+              <q-icon name="wc" size="16px" class="mr-1" />
+              是否腹瀉
+            </label>
+            <q-toggle v-model="formData.hasDiarrhea" color="amber" />
+          </div>
+          
+          <input 
+            v-if="formData.hasDiarrhea"
+            v-model.number="formData.diarrheaCount" 
+            type="number" 
+            min="1"
+            placeholder="腹瀉次數"
+            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+          />
         </div>
-        
-        <input 
-          v-if="formData.hasDiarrhea"
-          v-model.number="formData.diarrheaCount" 
-          type="number" 
-          min="1"
-          placeholder="腹瀉次數"
-          class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-        />
       </div>
       
       <div class="grid grid-cols-2 gap-4 mb-2">
@@ -148,39 +163,41 @@
         </div>
       </div>
       
-      <!-- 新增每日體重欄位 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          <q-icon name="monitor_weight" size="16px" class="mr-1" />
-          體重 (kg)
-        </label>
-        <div class="flex">
-          <input 
-            v-model.number="formData.dailyWeight" 
-            type="number" 
-            min="0" 
-            step="0.01"
-            placeholder="Kg"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-          />
+      <div class="grid grid-cols-2 gap-4">
+        <!-- 新增每日體重欄位 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            <q-icon name="monitor_weight" size="16px" class="mr-1" />
+            體重 (kg)
+          </label>
+          <div class="flex">
+            <input 
+              v-model.number="formData.dailyWeight" 
+              type="number" 
+              min="0" 
+              step="0.01"
+              placeholder="Kg"
+              class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+            />
+          </div>
         </div>
-      </div>
-
-      <!-- 體溫 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          <q-icon name="device_thermostat" size="16px" class="mr-1" />
-          體溫 (°C)
-        </label>
-        <div class="flex">
-          <input 
-            v-model.number="formData.temperature" 
-            type="number" 
-            min="0" 
-            step="0.1"
-            placeholder="°C"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-          />
+  
+        <!-- 體溫 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            <q-icon name="device_thermostat" size="16px" class="mr-1" />
+            體溫 (°C)
+          </label>
+          <div class="flex">
+            <input 
+              v-model.number="formData.temperature" 
+              type="number" 
+              min="0" 
+              step="0.1"
+              placeholder="°C"
+              class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -244,9 +261,9 @@ const originalData = ref(null);
 
 // Form data
 const formData = reactive({
-  tag: '',
-  foodCount: null,
-  foodAmount: null,
+  tags: [],
+  foodAmount: null, // Dry food amount (g)
+  wetFoodAmount: 0, // 0-10
   hasVomit: false,
   vomitCount: null,
   hasDiarrhea: false,
@@ -259,15 +276,28 @@ const formData = reactive({
   mediaFiles: []
 });
 
+// Calculate calories
+const calculatedCalories = computed(() => {
+  if (!userStore.family) return 0;
+  
+  const wetCalsPerUnit = userStore.family.wetFoodCalories || 0;
+  const dryCalsPerGram = userStore.family.dryFoodCalories || 0;
+  
+  const wetCals = (formData.wetFoodAmount / 10) * wetCalsPerUnit;
+  const dryCals = (formData.foodAmount || 0) * dryCalsPerGram;
+  
+  return Math.round(wetCals + dryCals);
+});
+
 // Detect changes by comparing with original data
 const hasChanges = computed(() => {
   if (!originalData.value) return false;
   
   // Simple comparison of important fields
   return JSON.stringify({
-    tag: formData.tag,
-    foodCount: formData.foodCount,
+    tags: formData.tags,
     foodAmount: formData.foodAmount,
+    wetFoodAmount: formData.wetFoodAmount,
     hasVomit: formData.hasVomit,
     vomitCount: formData.vomitCount,
     hasDiarrhea: formData.hasDiarrhea,
@@ -279,9 +309,9 @@ const hasChanges = computed(() => {
     notes: formData.notes,
     mediaFilesCount: formData.mediaFiles.length
   }) !== JSON.stringify({
-    tag: originalData.value.tag,
-    foodCount: originalData.value.foodCount,
+    tags: originalData.value.tags,
     foodAmount: originalData.value.foodAmount,
+    wetFoodAmount: originalData.value.wetFoodAmount,
     hasVomit: originalData.value.hasVomit,
     vomitCount: originalData.value.vomitCount,
     hasDiarrhea: originalData.value.hasDiarrhea,
@@ -319,9 +349,9 @@ const loadDailyRecord = async (date) => {
     
     // Default values
     const defaultData = {
-      tag: '',
-      foodCount: null,
+      tags: [],
       foodAmount: null,
+      wetFoodAmount: 0,
       hasVomit: false,
       vomitCount: null,
       hasDiarrhea: false,
@@ -337,6 +367,13 @@ const loadDailyRecord = async (date) => {
     if (recordDoc.exists()) {
       // Load existing data
       const recordData = recordDoc.data();
+      
+      // Migration: Handle old tag field
+      if (recordData.tag && !recordData.tags) {
+        recordData.tags = [recordData.tag];
+      } else if (!recordData.tags) {
+        recordData.tags = [];
+      }
       
       // Process media files data, ensure each file has correct type flags
       const mediaFiles = (recordData.mediaFiles || []).map(file => ({
@@ -465,9 +502,12 @@ const saveRecord = async () => {
       petId: props.petId,
       familyId: userStore.family.id,
       date: dateString,
-      tag: formData.tag || null,
-      foodCount: formData.foodCount || null,
+      tags: formData.tags || [],
+      // Deprecated: tag
+      tag: formData.tags.length > 0 ? formData.tags[0] : null, 
       foodAmount: formData.foodAmount || null,
+      wetFoodAmount: formData.wetFoodAmount || 0,
+      calories: calculatedCalories.value,
       hasVomit: formData.hasVomit || false,
       vomitCount: formData.hasVomit ? (formData.vomitCount || 1) : null,
       hasDiarrhea: formData.hasDiarrhea || false,
@@ -506,7 +546,8 @@ const saveRecord = async () => {
     emit('saved', {
       date: props.selectedDate,
       hasRecord: true,
-      tag: formData.tag || null,
+      tags: formData.tags || [],
+      tag: formData.tags.length > 0 ? formData.tags[0] : null, // backward compatibility
       hasNotes: !!formData.notes,
       hasVomit: formData.hasVomit,
       hasDiarrhea: formData.hasDiarrhea,

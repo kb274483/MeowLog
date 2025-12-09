@@ -268,7 +268,21 @@ const formatDateKey = (year, month, day) => {
 
 const getDailyTag = (day) => {
   const dateKey = formatDateKey(currentYear.value, currentMonth.value, day);
-  return dailyRecords[dateKey]?.tag || null;
+  const record = dailyRecords[dateKey];
+  if (!record) return null;
+  
+  if (record.tags && record.tags.length > 0) {
+    // Show first tag and maybe indicator if more? 
+    // For small calendar cell, maybe just first tag is enough or join with comma if short
+    // But space is limited. Let's return first tag for now or "Tag(N)"
+    // Or return joined string if space permits.
+    // Let's assume badges style.
+    // If I return an array, the template needs to handle it.
+    // The current template expects a string: {{ getDailyTag(day) }}
+    // So I'll join them.
+    return record.tags[0] + (record.tags.length > 1 ? '+' : '');
+  }
+  return record.tag || null;
 };
 
 const getDailyWeight = (day) => {
@@ -339,7 +353,8 @@ const handleRecordSaved = async (data) => {
   // update daily records
   dailyRecords[dateKey] = { 
     hasRecord: true,
-    tag: data.tag,
+    tag: data.tag, // Keep for backward compat
+    tags: data.tags || [],
     hasNotes: data.hasNotes,
     hasVomit: data.hasVomit,
     hasDiarrhea: data.hasDiarrhea,
@@ -396,9 +411,16 @@ const fetchPetDailyRecords = async () => {
     querySnapshot.forEach((doc) => {
       const recordData = doc.data();
       if (recordData.date) {
+        let tags = recordData.tags || [];
+        // Migration check
+        if (!tags.length && recordData.tag) {
+          tags = [recordData.tag];
+        }
+
         dailyRecords[recordData.date] = {
           hasRecord: true,
           tag: recordData.tag || null,
+          tags: tags,
           hasNotes: !!recordData.notes, // To Boolean
           hasVomit: recordData.hasVomit || false,
           hasDiarrhea: recordData.hasDiarrhea || false,

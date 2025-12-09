@@ -7,7 +7,7 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
  * @param {String} familyId - 家庭 ID
  * @param {Date} startDate - 開始日期
  * @param {Date} endDate - 結束日期
- * @param {String[]} metrics - 要分析的指標 ['foodAmount', 'dailyWeight', 'respirationRate', 'heartRate', 'temperature']
+ * @param {String[]} metrics - 要分析的指標 ['foodAmount', 'dailyWeight', 'respirationRate', 'heartRate', 'temperature', 'wetFoodAmount', 'calories']
  * @returns {Promise<Object>} - 時間序列數據
  */
 export const getPetTimeSeriesData = async (petId, familyId, startDate, endDate, metrics = []) => {
@@ -30,7 +30,9 @@ export const getPetTimeSeriesData = async (petId, familyId, startDate, endDate, 
         foodAmount: [],
         respirationRate: [],
         heartRate: [],
-        temperature: []
+        temperature: [],
+        wetFoodAmount: [],
+        calories: []
       }
     };
     

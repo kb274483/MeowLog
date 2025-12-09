@@ -12,6 +12,7 @@ import {
   getDocs,
   addDoc,
   setDoc,
+  updateDoc,
   serverTimestamp
 } from 'src/boot/firebase'
 
@@ -188,6 +189,31 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
+  // Update family settings
+  const updateFamilySettings = async (settings) => {
+    if (!user.value || !family.value) return false
+    
+    try {
+      const familyRef = doc(db, 'families', family.value.id)
+      
+      await updateDoc(familyRef, {
+        ...settings,
+        updatedAt: serverTimestamp()
+      })
+      
+      // Update local state
+      family.value = {
+        ...family.value,
+        ...settings
+      }
+      
+      return true
+    } catch (error) {
+      console.error('Update family settings failed', error)
+      return false
+    }
+  }
+
   return {
     // State
     user,
@@ -204,6 +230,7 @@ export const useUserStore = defineStore('user', () => {
     loadUserFamily,
     createFamily,
     joinFamily,
-    leaveFamily
+    leaveFamily,
+    updateFamilySettings
   }
 }) 

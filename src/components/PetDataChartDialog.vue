@@ -316,13 +316,26 @@ const renderChartOnElement = (element) => {
         selectedTimeRange.value.interval
       );
       
-      labels = foodAverages.labels; // Labels should be same
+      // Merge all labels from both datasets to ensure X-axis covers all dates
+      const allLabels = new Set([...foodAverages.labels, ...wetAverages.labels]);
+      labels = Array.from(allLabels).sort();
+      
+      // Map values to the unified label list, filling missing data with null
+      const foodValues = labels.map(label => {
+        const index = foodAverages.labels.indexOf(label);
+        return index !== -1 ? foodAverages.values[index] : null;
+      });
+      
+      const wetValues = labels.map(label => {
+        const index = wetAverages.labels.indexOf(label);
+        return index !== -1 ? wetAverages.values[index] : null;
+      });
       
       datasets = [
         {
           type: 'line',
           label: '乾糧攝取量 (g)',
-          data: foodAverages.values,
+          data: foodValues,
           borderColor: '#F59E0B',
           backgroundColor: 'rgba(245, 158, 11, 0.5)',
           tension: 0.3,
@@ -331,7 +344,7 @@ const renderChartOnElement = (element) => {
         {
           type: 'bar',
           label: '濕食攝取量',
-          data: wetAverages.values,
+          data: wetValues,
           borderColor: '#0a468f',
           backgroundColor: '#0a468faa',
           yAxisID: 'y1'

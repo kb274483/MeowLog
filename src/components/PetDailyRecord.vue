@@ -264,6 +264,7 @@ const formData = reactive({
   tags: [],
   foodAmount: null, // Dry food amount (g)
   wetFoodAmount: 0, // 0-10
+  calories: null, // Stored calories from DB (historical truth)
   hasVomit: false,
   vomitCount: null,
   hasDiarrhea: false,
@@ -276,8 +277,8 @@ const formData = reactive({
   mediaFiles: []
 });
 
-// Calculate calories
-const calculatedCalories = computed(() => {
+// Calculate calories based on CURRENT family settings (for live edits)
+const caloriesFromInputs = computed(() => {
   if (!userStore.family) return 0;
   
   const wetCalsPerUnit = userStore.family.wetFoodCalories || 0;
@@ -287,6 +288,27 @@ const calculatedCalories = computed(() => {
   const dryCals = (formData.foodAmount || 0) * dryCalsPerGram;
   
   return Math.round(wetCals + dryCals);
+});
+
+// When DB has calories, prefer it unless the user changed intake amounts for the day
+const shouldUseStoredCalories = computed(() => {
+  if (!originalData.value) return false;
+  const hasStoredCalories = formData.calories !== null && formData.calories !== undefined;
+  if (!hasStoredCalories) return false;
+
+  const inputsUnchanged =
+    formData.foodAmount === originalData.value.foodAmount &&
+    formData.wetFoodAmount === originalData.value.wetFoodAmount;
+
+  return inputsUnchanged;
+});
+
+// Calories shown in UI / saved to DB
+const calculatedCalories = computed(() => {
+  if (shouldUseStoredCalories.value) {
+    return Number(formData.calories) || 0;
+  }
+  return caloriesFromInputs.value;
 });
 
 // Detect changes by comparing with original data
@@ -352,6 +374,7 @@ const loadDailyRecord = async (date) => {
       tags: [],
       foodAmount: null,
       wetFoodAmount: 0,
+      calories: null,
       hasVomit: false,
       vomitCount: null,
       hasDiarrhea: false,
@@ -531,6 +554,8 @@ const saveRecord = async () => {
     
     // Save to Firestore
     await setDoc(doc(db, 'petDailyRecords', recordId), recordData);
+    // Keep local state consistent with what we saved (prevents reverting to old calories)
+    formData.calories = recordData.calories;
     originalData.value = JSON.parse(JSON.stringify(formData));
     
     // Update pet weight if filled

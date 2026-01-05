@@ -51,13 +51,28 @@
         </svg>
       </button>
       
-      <!-- fullscreen image -->
-      <img 
-        v-if="fullscreenMedia.type === 'image'" 
-        :src="getFullscreenImageSource(fullscreenMedia)" 
-        class="max-h-[90vh] max-w-[90vw] object-contain" 
+      <!-- fullscreen image (pinch to zoom / pan) -->
+      <div
+        v-if="fullscreenMedia.type === 'image'"
+        ref="fullscreenImageViewport"
+        class="max-h-[90vh] max-w-[90vw] overflow-hidden"
         @click.stop
-      />
+        @dblclick.stop="toggleZoomAtCenter"
+        @wheel.prevent.stop="onFullscreenWheel"
+        @touchstart.prevent.stop="onFullscreenTouchStart"
+        @touchmove.prevent.stop="onFullscreenTouchMove"
+        @touchend.prevent.stop="onFullscreenTouchEnd"
+        @touchcancel.prevent.stop="onFullscreenTouchEnd"
+      >
+        <img
+          ref="fullscreenImageEl"
+          :src="getFullscreenImageSource(fullscreenMedia)"
+          class="max-h-[90vh] max-w-[90vw] object-contain select-none fullscreen-zoom-img"
+          :style="fullscreenImageStyle"
+          draggable="false"
+          @click.stop
+        />
+      </div>
       
       <!-- fullscreen video -->
       <video 
@@ -140,7 +155,7 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount, nextTick } from 'vue';
+import { ref, onBeforeUnmount, nextTick, computed } from 'vue';
 import { notification } from 'src/boot/notification';
 
 const props = defineProps({
@@ -174,6 +189,219 @@ const objectUrls = ref([]);
 // fullscreen related state
 const fullscreenMedia = ref(null);
 const fullscreenLoading = ref(false);
+const fullscreenImageViewport = ref(null);
+const fullscreenImageEl = ref(null);
+
+// fullscreen zoom/pan state (for images)
+const zoomScale = ref(1);
+const zoomTranslateX = ref(0);
+const zoomTranslateY = ref(0);
+const isGestureActive = ref(false);
+const gesture = ref({
+  mode: null, // 'pan' | 'pinch'
+  startX: 0,
+  startY: 0,
+  startTranslateX: 0,
+  startTranslateY: 0,
+  startScale: 1,
+  startDistance: 0,
+  startMidX: 0,
+  startMidY: 0,
+  rectLeft: 0,
+  rectTop: 0,
+  rectWidth: 0,
+  rectHeight: 0
+});
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const getViewportRect = () => {
+  const el = fullscreenImageViewport.value;
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
+  return {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height
+  };
+};
+
+const clampTranslateToBounds = () => {
+  const rect = getViewportRect();
+  if (!rect) return;
+  const maxX = ((zoomScale.value - 1) * rect.width) / 2;
+  const maxY = ((zoomScale.value - 1) * rect.height) / 2;
+
+  if (zoomScale.value <= 1) {
+    zoomTranslateX.value = 0;
+    zoomTranslateY.value = 0;
+    return;
+  }
+
+  zoomTranslateX.value = clamp(zoomTranslateX.value, -maxX, maxX);
+  zoomTranslateY.value = clamp(zoomTranslateY.value, -maxY, maxY);
+};
+
+const resetFullscreenZoom = () => {
+  zoomScale.value = 1;
+  zoomTranslateX.value = 0;
+  zoomTranslateY.value = 0;
+  isGestureActive.value = false;
+  gesture.value.mode = null;
+};
+
+const toggleZoomAtCenter = () => {
+  // simple desktop UX: dblclick toggles between 1x and 2x at center
+  if (!fullscreenMedia.value || fullscreenMedia.value.type !== 'image') return;
+  if (zoomScale.value > 1) {
+    resetFullscreenZoom();
+  } else {
+    zoomScale.value = 2;
+    zoomTranslateX.value = 0;
+    zoomTranslateY.value = 0;
+  }
+};
+
+const getTouchPoint = (touch, rect) => ({
+  x: touch.clientX - rect.left,
+  y: touch.clientY - rect.top
+});
+
+const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const midpoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+const onFullscreenTouchStart = (e) => {
+  if (!fullscreenMedia.value || fullscreenMedia.value.type !== 'image') return;
+  const rect = getViewportRect();
+  if (!rect) return;
+
+  isGestureActive.value = true;
+  gesture.value.rectLeft = rect.left;
+  gesture.value.rectTop = rect.top;
+  gesture.value.rectWidth = rect.width;
+  gesture.value.rectHeight = rect.height;
+  gesture.value.startTranslateX = zoomTranslateX.value;
+  gesture.value.startTranslateY = zoomTranslateY.value;
+  gesture.value.startScale = zoomScale.value;
+
+  if (e.touches.length >= 2) {
+    gesture.value.mode = 'pinch';
+    const p1 = getTouchPoint(e.touches[0], rect);
+    const p2 = getTouchPoint(e.touches[1], rect);
+    const mid = midpoint(p1, p2);
+    gesture.value.startDistance = distance(p1, p2);
+    gesture.value.startMidX = mid.x;
+    gesture.value.startMidY = mid.y;
+  } else {
+    gesture.value.mode = 'pan';
+    gesture.value.startX = e.touches[0].clientX;
+    gesture.value.startY = e.touches[0].clientY;
+  }
+};
+
+const onFullscreenTouchMove = (e) => {
+  if (!isGestureActive.value) return;
+  const rect = getViewportRect();
+  if (!rect) return;
+
+  if (gesture.value.mode === 'pinch' && e.touches.length >= 2) {
+    const p1 = getTouchPoint(e.touches[0], rect);
+    const p2 = getTouchPoint(e.touches[1], rect);
+    const mid = midpoint(p1, p2);
+    const d = distance(p1, p2);
+    const ratio = gesture.value.startDistance ? d / gesture.value.startDistance : 1;
+    const nextScale = clamp(gesture.value.startScale * ratio, 1, 4);
+
+    // Keep the content under the fingers stable:
+    // Using a center-origin model:
+    // m = c + (p - c)*s + t  => keep p constant, solve t for new s
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const startT = { x: gesture.value.startTranslateX, y: gesture.value.startTranslateY };
+    const startS = gesture.value.startScale || 1;
+
+    const p = {
+      x: cx + (gesture.value.startMidX - cx - startT.x) / startS,
+      y: cy + (gesture.value.startMidY - cy - startT.y) / startS
+    };
+
+    zoomScale.value = nextScale;
+    zoomTranslateX.value = mid.x - cx - (p.x - cx) * nextScale;
+    zoomTranslateY.value = mid.y - cy - (p.y - cy) * nextScale;
+    clampTranslateToBounds();
+    return;
+  }
+
+  // Pan (single finger)
+  if (gesture.value.mode === 'pan' && e.touches.length === 1) {
+    if (zoomScale.value <= 1) return; // no need to pan at 1x
+    const dx = e.touches[0].clientX - gesture.value.startX;
+    const dy = e.touches[0].clientY - gesture.value.startY;
+    zoomTranslateX.value = gesture.value.startTranslateX + dx;
+    zoomTranslateY.value = gesture.value.startTranslateY + dy;
+    clampTranslateToBounds();
+  }
+};
+
+const onFullscreenTouchEnd = (e) => {
+  // If one finger remains after pinch, switch to pan smoothly
+  if (e.touches && e.touches.length === 1) {
+    gesture.value.mode = 'pan';
+    gesture.value.startX = e.touches[0].clientX;
+    gesture.value.startY = e.touches[0].clientY;
+    gesture.value.startTranslateX = zoomTranslateX.value;
+    gesture.value.startTranslateY = zoomTranslateY.value;
+    gesture.value.startScale = zoomScale.value;
+    return;
+  }
+
+  isGestureActive.value = false;
+  gesture.value.mode = null;
+  if (zoomScale.value <= 1) {
+    resetFullscreenZoom();
+  } else {
+    clampTranslateToBounds();
+  }
+};
+
+const onFullscreenWheel = (e) => {
+  if (!fullscreenMedia.value || fullscreenMedia.value.type !== 'image') return;
+  const rect = getViewportRect();
+  if (!rect) return;
+
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  const delta = -e.deltaY;
+  const zoomFactor = delta > 0 ? 1.1 : 1 / 1.1;
+  const startS = zoomScale.value;
+  const nextS = clamp(startS * zoomFactor, 1, 4);
+  if (nextS === startS) return;
+
+  const startT = { x: zoomTranslateX.value, y: zoomTranslateY.value };
+  const p = {
+    x: cx + (mx - cx - startT.x) / startS,
+    y: cy + (my - cy - startT.y) / startS
+  };
+
+  zoomScale.value = nextS;
+  zoomTranslateX.value = mx - cx - (p.x - cx) * nextS;
+  zoomTranslateY.value = my - cy - (p.y - cy) * nextS;
+  clampTranslateToBounds();
+};
+
+const fullscreenImageStyle = computed(() => {
+  const transition = isGestureActive.value ? 'none' : 'transform 120ms ease-out';
+  return {
+    transformOrigin: 'center center',
+    transform: `translate3d(${zoomTranslateX.value}px, ${zoomTranslateY.value}px, 0) scale(${zoomScale.value})`,
+    transition,
+    willChange: 'transform'
+  };
+});
 
 // get fullscreen image source
 const getFullscreenImageSource = (file) => {
@@ -196,6 +424,7 @@ const openFullscreen = (file) => {
   
   fullscreenLoading.value = true;
   fullscreenMedia.value = file;
+  resetFullscreenZoom();
   
   // Prevent background scrolling
   document.body.style.overflow = 'hidden';
@@ -227,6 +456,7 @@ const openFullscreen = (file) => {
 // close fullscreen
 const closeFullscreen = () => {
   fullscreenMedia.value = null;
+  resetFullscreenZoom();
   
   // Restore background scrolling
   document.body.style.overflow = '';
@@ -370,6 +600,13 @@ onBeforeUnmount(() => {
 :deep(body.no-scroll) {
   overflow: hidden;
   padding-right: 17px; /* Scrollbar width */
+}
+
+.fullscreen-zoom-img {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 </style> 

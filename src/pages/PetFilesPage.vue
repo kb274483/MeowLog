@@ -132,7 +132,7 @@
               class="w-full border border-dashed border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
               :disabled="uploading"
             >
-              {{ pickedFile ? `已選擇：${pickedFile.name}` : '選擇檔案（圖檔 / PDF / txt / Apple備忘錄等）' }}
+              {{ pickedFile ? `已選擇：${pickedFile.name}` : '選擇檔案' }}
             </button>
             <div class="text-xs text-gray-500 mt-2">
               若日期未填，將使用今天日期；檔名未填，將使用上傳檔名。

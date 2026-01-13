@@ -10,6 +10,11 @@ const routes = [
         component: () => import('pages/PetDetailsPage.vue') 
       },
       {
+        path: 'pet/:id/files',
+        name: 'pet-files',
+        component: () => import('pages/PetFilesPage.vue')
+      },
+      {
         path: 'bowl-logs',
         name: 'bowl-logs',
         component: () => import('pages/BowlLogsPage.vue')

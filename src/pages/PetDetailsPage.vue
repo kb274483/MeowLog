@@ -12,13 +12,13 @@
         </svg>
       </button>
       
-      <div v-if="pet" class="flex items-center">
+      <div v-if="pet" class="flex items-center flex-1 min-w-0">
         <img 
           :src="pet.photoURL || defaultImage" 
           :alt="pet.name" 
           class="w-10 h-10 rounded-full object-cover mr-3"
         />
-        <div>
+        <div class="min-w-0">
           <h1 class="text-lg font-semibold text-gray-800">{{ pet.name }}</h1>
           <div class="flex text-xs text-gray-500 space-x-2">
             <span>{{ displayAge }} 歲</span>
@@ -32,6 +32,15 @@
           </div>
         </div>
       </div>
+
+      <button
+        v-if="pet"
+        @click="goToFiles"
+        class="ml-2 mr-2 p-3 hover:bg-gray-100 rounded-full text-gray-700 transition-colors"
+        title="檔案管理"
+      >
+        <q-icon name="folder" size="24px" />
+      </button>
     </div>
     
     <!-- loading -->
@@ -235,6 +244,11 @@ const showDataChart = ref(false);
 // Go Back
 const goBack = () => {
   router.push('/');
+};
+
+const goToFiles = () => {
+  if (!pet.value?.id) return;
+  router.push({ name: 'pet-files', params: { id: pet.value.id } });
 };
 
 // 

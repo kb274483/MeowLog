@@ -32,7 +32,16 @@
         <q-spinner-dots size="40px" color="amber" />
       </div>
       <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-        <h3 class="text-white text-lg font-bold">{{ pet.name }}</h3>
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="text-white text-lg font-bold truncate">{{ pet.name }}</h3>
+          <button
+            @click.stop="goToFiles"
+            class="shrink-0 bg-white/15 hover:bg-white/25 text-white p-1.5 rounded-full transition-colors"
+            title="檔案管理"
+          >
+            <q-icon name="folder" size="16px" />
+          </button>
+        </div>
       </div>
     </div>
     
@@ -71,6 +80,7 @@
 
 <script setup>
 import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import ConfirmDialog from './ConfirmDialog.vue';
 
 const props = defineProps({
@@ -82,10 +92,16 @@ const props = defineProps({
 
 const emit = defineEmits(['edit-pet', 'delete-pet']);
 const isImageLoading = ref(true);
+const router = useRouter();
 
 const handleImageLoad = () => {
   isImageLoading.value = false;
 }
+
+const goToFiles = () => {
+  if (!props.pet?.id) return;
+  router.push({ name: 'pet-files', params: { id: props.pet.id } });
+};
 
 // Delete Confirmation
 const showConfirmDelete = ref(false);
@@ -145,6 +161,7 @@ const handleDelete = async () => {
 <style scoped>
 .line-clamp-2 {
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;

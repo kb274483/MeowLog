@@ -9,7 +9,7 @@
   >
     <div 
       v-if="show" 
-      class="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+      class="fixed inset-0 z-[10000] flex items-center justify-center px-4 py-6"
     >
       <div 
         class="fixed inset-0 transition-opacity"

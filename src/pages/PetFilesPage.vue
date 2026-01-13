@@ -14,7 +14,7 @@
 
       <button
         @click="openUploadDialog"
-        class="bg-amber-600 hover:bg-amber-700 text-white rounded-lg px-4 py-2 shadow-sm transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+        class="bg-gray-500 hover:bg-gray-400 text-white rounded-lg px-4 py-2 shadow-sm transition disabled:bg-gray-300 disabled:cursor-not-allowed"
         :disabled="loading || uploading"
       >
         上傳檔案
@@ -93,8 +93,17 @@
                   flat
                   round
                   dense
+                  icon="edit"
+                  color="blue-grey-4"
+                  title="編輯"
+                  @click.stop="requestEdit(f)"
+                />
+                <q-btn
+                  flat
+                  round
+                  dense
                   icon="delete"
-                  color="red"
+                  color="red-4"
                   title="刪除"
                   @click.stop="requestDelete(f)"
                 />
@@ -135,7 +144,10 @@
               {{ pickedFile ? `已選擇：${pickedFile.name}` : '選擇檔案' }}
             </button>
             <div class="text-xs text-gray-500 mt-2">
-              若日期未填，將使用今天日期；檔名未填，將使用上傳檔名。
+              日期未填，將使用今日日期。
+            </div>
+            <div class="text-xs text-gray-500 mt-2">
+              檔名未填，將使用上傳檔名。
             </div>
           </div>
 
@@ -317,13 +329,47 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <!-- 編輯檔名/日期 -->
+    <q-dialog v-model="showEditDialog" persistent>
+      <q-card style="width: 520px; max-width: 95vw;">
+        <q-card-section class="flex items-center justify-between">
+          <div class="text-base font-bold">編輯</div>
+          <q-btn flat round icon="close" @click="closeEditDialog" :disable="isUpdating" />
+        </q-card-section>
+        <q-separator />
+        <q-card-section>
+          <div class="grid grid-cols-1 gap-3">
+            <q-input v-model="editDate" type="date" label="日期" dense outlined :disable="isUpdating" />
+            <q-input v-model="editName" type="text" label="檔名" dense outlined :disable="isUpdating" />
+          </div>
+        </q-card-section>
+        <q-separator />
+        <q-card-actions align="right">
+          <q-btn flat label="取消" @click="closeEditDialog" :disable="isUpdating" />
+          <q-btn color="amber" label="儲存" @click="confirmEdit" :loading="isUpdating" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <!-- PDF fallback（PWA 內預覽疑似失敗時，詢問是否改用瀏覽器開啟） -->
+    <confirm-dialog
+      v-model="showPdfFallbackConfirm"
+      title="PDF 無法預覽"
+      :message="`「${viewingFile?.name || 'PDF'}」在 PWA 內預覽可能載入失敗，要改用瀏覽器開啟嗎？`"
+      confirm-label="改用瀏覽器開啟"
+      cancel-label="繼續等待"
+      confirm-color="amber-8"
+      @confirm="confirmOpenPdfInBrowser"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useRouter } from 'vue-router';
+import ConfirmDialog from 'src/components/ConfirmDialog.vue';
 import {
   db,
   collection,
@@ -332,7 +378,8 @@ import {
   query,
   where,
   getDocs,
-  serverTimestamp
+  serverTimestamp,
+  updateDoc
 } from 'src/boot/firebase';
 import { deleteDoc, storage, storageRef, deleteObject } from 'src/boot/firebase';
 import { notification } from 'src/boot/notification';
@@ -382,6 +429,12 @@ const showDeleteDialog = ref(false);
 const fileToDelete = ref(null);
 const isDeleting = ref(false);
 
+const showEditDialog = ref(false);
+const fileToEdit = ref(null);
+const editDate = ref('');
+const editName = ref('');
+const isUpdating = ref(false);
+
 const isStandalonePwa = computed(() => {
   try {
     // iOS Safari PWA
@@ -398,6 +451,8 @@ const isStandalonePwa = computed(() => {
 
 const pdfIframeLoaded = ref(false);
 let pdfFallbackTimer = null;
+const showPdfFallbackConfirm = ref(false);
+const pdfFallbackOffered = ref(false);
 
 const pdfViewerUrl = computed(() => {
   const url = viewingFile.value?.url || '';
@@ -531,7 +586,8 @@ const fetchFiles = async () => {
     // Avoid caching Vue reactive proxies / Firestore Timestamp objects directly
     void cacheSet(cacheKey, files.value.map((f) => ({
       ...f,
-      createdAt: f?.createdAt?.toMillis?.() ?? f?.createdAt ?? null
+      createdAt: f?.createdAt?.toMillis?.() ?? f?.createdAt ?? null,
+      updatedAt: f?.updatedAt?.toMillis?.() ?? f?.updatedAt ?? null
     })));
   } catch (e) {
     console.error(e);
@@ -650,17 +706,25 @@ const openViewer = async (f) => {
   textContent.value = '';
   showViewer.value = true;
   pdfIframeLoaded.value = false;
+  showPdfFallbackConfirm.value = false;
+  pdfFallbackOffered.value = false;
 
   // PWA 中 iframe 開 PDF 可能不穩：若短時間內未成功載入，就改用瀏覽器開啟
   if (f?.fileCategory === 'pdf' && isStandalonePwa.value && f?.url) {
     if (pdfFallbackTimer) clearTimeout(pdfFallbackTimer);
     pdfFallbackTimer = setTimeout(() => {
-      if (!pdfIframeLoaded.value) {
-        notification.info('PWA 預覽 PDF 不穩定，已改用瀏覽器開啟');
-        openInBrowser(f.url);
-        closeViewer();
+      // 注意：iOS PWA 下 iframe load 事件可能不穩，因此這裡只「提示/詢問」而不強制外開
+      if (
+        !pdfIframeLoaded.value &&
+        showViewer.value &&
+        viewingFile.value?.fileCategory === 'pdf' &&
+        viewingFile.value?.url &&
+        !pdfFallbackOffered.value
+      ) {
+        pdfFallbackOffered.value = true;
+        showPdfFallbackConfirm.value = true;
       }
-    }, 1500);
+    }, 5000);
   }
 
   if (f?.fileCategory === 'text' && f?.url) {
@@ -684,6 +748,8 @@ const closeViewer = () => {
   pointers.value = new Map();
   pointerGesture.value = null;
   pdfIframeLoaded.value = false;
+  showPdfFallbackConfirm.value = false;
+  pdfFallbackOffered.value = false;
   if (pdfFallbackTimer) {
     clearTimeout(pdfFallbackTimer);
     pdfFallbackTimer = null;
@@ -824,10 +890,20 @@ const openInBrowser = (url) => {
 
 const onPdfIframeLoad = () => {
   pdfIframeLoaded.value = true;
+  showPdfFallbackConfirm.value = false;
+  pdfFallbackOffered.value = false;
   if (pdfFallbackTimer) {
     clearTimeout(pdfFallbackTimer);
     pdfFallbackTimer = null;
   }
+};
+
+const confirmOpenPdfInBrowser = () => {
+  const url = viewingFile.value?.url;
+  showPdfFallbackConfirm.value = false;
+  if (!url) return;
+  openInBrowser(url);
+  closeViewer();
 };
 
 const rotateLeft = () => {
@@ -954,6 +1030,81 @@ const shareFile = async () => {
 const requestDelete = (f) => {
   fileToDelete.value = f;
   showDeleteDialog.value = true;
+};
+
+const requestEdit = (f) => {
+  fileToEdit.value = f;
+  editDate.value = String(f?.date || '');
+  editName.value = String(f?.name || '');
+  showEditDialog.value = true;
+};
+
+const closeEditDialog = ({ force = false } = {}) => {
+  if (!force && isUpdating.value) return;
+  showEditDialog.value = false;
+  fileToEdit.value = null;
+  editDate.value = '';
+  editName.value = '';
+};
+
+const confirmEdit = async () => {
+  const f = fileToEdit.value;
+  if (!f?.id) return;
+  if (!userStore.isLoggedIn || !userStore.hasFamily) {
+    notification.error('未登入或無家庭資訊');
+    return;
+  }
+
+  const nextDate = (editDate.value && String(editDate.value)) || String(f.date || '');
+  const nextName = (editName.value && String(editName.value).trim()) || String(f.name || '');
+  if (!nextDate) {
+    notification.error('請填寫日期');
+    return;
+  }
+  if (!nextName) {
+    notification.error('請填寫檔名');
+    return;
+  }
+
+  isUpdating.value = true;
+  let success = false;
+  try {
+    await updateDoc(doc(db, 'petFiles', f.id), {
+      date: nextDate,
+      name: nextName,
+      updatedAt: serverTimestamp(),
+      updatedBy: userStore.user?.uid || null
+    });
+
+    // 更新列表（讓篩選/排序立即生效）
+    files.value = files.value.map((x) => (x.id === f.id ? { ...x, date: nextDate, name: nextName } : x));
+
+    // 若正在預覽同一份檔案，同步更新標題/日期
+    if (viewingFile.value?.id === f.id) {
+      viewingFile.value = { ...viewingFile.value, date: nextDate, name: nextName };
+    }
+
+    // 更新快取
+    const cacheKey = `petFiles:${userStore.family.id}:${petId.value}`;
+    void cacheSet(cacheKey, files.value.map((ff) => ({
+      ...ff,
+      createdAt: ff?.createdAt?.toMillis?.() ?? ff?.createdAt ?? null,
+      updatedAt: ff?.updatedAt?.toMillis?.() ?? ff?.updatedAt ?? null
+    })));
+    success = true;
+  } catch (e) {
+    console.error(e);
+    notification.error('更新失敗');
+  } finally {
+    isUpdating.value = false;
+  }
+
+  if (success) {
+    // 先關閉編輯視窗，避免通知被 QDialog 蓋住
+    closeEditDialog({ force: true });
+    await nextTick();
+    notification.success('已更新');
+  }
 };
 
 const confirmDelete = async () => {

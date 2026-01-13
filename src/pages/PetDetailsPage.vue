@@ -202,14 +202,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue';
+import { ref, computed, onMounted, reactive, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { usePetStore } from 'src/stores/petStore';
 import { useUserStore } from 'src/stores/userStore';
 import { notification } from 'src/boot/notification';
 import PetDailyRecord from 'src/components/PetDailyRecord.vue';
 import PetDataChartDialog from 'src/components/PetDataChartDialog.vue';
-import { db, collection, query, where, getDocs } from 'src/boot/firebase';
+import { db, collection, query, where, getDocs, doc, getDoc } from 'src/boot/firebase';
+import { orderBy } from 'firebase/firestore';
+import { cacheGet, cacheSet } from 'src/utils/idbCache';
 
 const route = useRoute();
 const router = useRouter();
@@ -240,6 +242,10 @@ const selectedDay = ref(null);
 const selectedDateObj = ref(null);
 const dailyRecords = reactive({});
 const showDataChart = ref(false);
+
+const monthKey = computed(() => {
+  return `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`;
+});
 
 // Go Back
 const goBack = () => {
@@ -410,39 +416,111 @@ const fetchPetDailyRecords = async () => {
   if (!pet.value || !userStore.hasFamily) return;
   
   try {
-    const petRecordsQuery = query(
-      collection(db, 'petDailyRecords'),
-      where('petId', '==', pet.value.id),
-      where('familyId', '==', userStore.family.id)
-    );
-    
-    const querySnapshot = await getDocs(petRecordsQuery);
-    
-    // Clear old data
-    Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
-    
-    // Fill daily records
-    querySnapshot.forEach((doc) => {
-      const recordData = doc.data();
-      if (recordData.date) {
-        let tags = recordData.tags || [];
-        // Migration check
-        if (!tags.length && recordData.tag) {
-          tags = [recordData.tag];
-        }
+    const cacheKey = `petDailySummary:${userStore.family.id}:${pet.value.id}:${monthKey.value}`;
 
-        dailyRecords[recordData.date] = {
+    // 先用快取秒顯示
+    const cached = await cacheGet(cacheKey, { maxAgeMs: 1000 * 60 * 60 * 24 * 30 });
+    const hadCached = !!(cached && typeof cached === 'object');
+    if (cached && typeof cached === 'object') {
+      Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
+      Object.entries(cached).forEach(([date, summary]) => {
+        dailyRecords[date] = summary;
+      });
+    }
+
+    const monthStart = `${monthKey.value}-01`;
+    const monthEnd = formatDate(new Date(currentYear.value, currentMonth.value + 1, 0));
+
+    const summaryForCache = {};
+
+    // 1) 優先嘗試「當月區間」查詢（最快、最少讀取）
+    try {
+      const petRecordsQuery = query(
+        collection(db, 'petDailyRecords'),
+        where('petId', '==', pet.value.id),
+        where('familyId', '==', userStore.family.id),
+        where('date', '>=', monthStart),
+        where('date', '<=', monthEnd),
+        orderBy('date', 'asc')
+      );
+
+      const querySnapshot = await getDocs(petRecordsQuery);
+      Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
+
+      querySnapshot.forEach((d) => {
+        const recordData = d.data();
+        if (!recordData?.date) return;
+
+        let tags = recordData.tags || [];
+        if (!tags.length && recordData.tag) tags = [recordData.tag];
+
+        const summary = {
           hasRecord: true,
           tag: recordData.tag || null,
           tags: tags,
-          hasNotes: !!recordData.notes, // To Boolean
+          hasNotes: !!recordData.notes,
           hasVomit: recordData.hasVomit || false,
           hasDiarrhea: recordData.hasDiarrhea || false,
           dailyWeight: recordData.dailyWeight || null,
           temperature: recordData.temperature || null
         };
-      }
-    });
+
+        dailyRecords[recordData.date] = summary;
+        summaryForCache[recordData.date] = summary;
+      });
+
+      void cacheSet(cacheKey, summaryForCache);
+      return;
+    } catch (e) {
+      console.warn('Monthly query failed, falling back to per-day getDoc:', e);
+    }
+
+    // 2) 若缺 index：用 recordId 逐日 getDoc（最多 31 次，通常比全量 query 快很多）
+    const days = new Date(currentYear.value, currentMonth.value + 1, 0).getDate();
+    const reads = [];
+    const tempRecords = {};
+
+    for (let day = 1; day <= days; day++) {
+      const dateString = formatDateKey(currentYear.value, currentMonth.value, day);
+      const recordId = `${pet.value.id}_${dateString}`;
+      const recordRef = doc(db, 'petDailyRecords', recordId);
+      reads.push(
+        getDoc(recordRef).then((snap) => {
+          if (!snap.exists()) return;
+          const recordData = snap.data();
+          if (!recordData?.date) return;
+          let tags = recordData.tags || [];
+          if (!tags.length && recordData.tag) tags = [recordData.tag];
+
+          const summary = {
+            hasRecord: true,
+            tag: recordData.tag || null,
+            tags: tags,
+            hasNotes: !!recordData.notes,
+            hasVomit: recordData.hasVomit || false,
+            hasDiarrhea: recordData.hasDiarrhea || false,
+            dailyWeight: recordData.dailyWeight || null,
+            temperature: recordData.temperature || null
+          };
+
+          tempRecords[recordData.date] = summary;
+          summaryForCache[recordData.date] = summary;
+        })
+      );
+    }
+
+    await Promise.all(reads);
+
+    const gotAny = Object.keys(tempRecords).length > 0;
+    if (gotAny) {
+      Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
+      Object.entries(tempRecords).forEach(([date, summary]) => {
+        dailyRecords[date] = summary;
+      });
+      void cacheSet(cacheKey, summaryForCache);
+    } else if (!hadCached) {
+      Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
+    }
   } catch (error) {
     console.error('Error:', error);
   }
@@ -503,7 +581,9 @@ const fetchPetDetails = async () => {
     
     if (foundPet) {
       pet.value = foundPet;
-      await fetchPetDailyRecords();
+      // 先讓畫面出來（快取會在 fetchPetDailyRecords 內立刻填上），網路更新在背景跑
+      loading.value = false;
+      void fetchPetDailyRecords();
     } else {
       notification.error('找不到此寵物');
     }
@@ -511,7 +591,7 @@ const fetchPetDetails = async () => {
     console.error('Error:', error);
     notification.error(error.message || 'Can not fetch pet details');
   } finally {
-    loading.value = false;
+    if (loading.value) loading.value = false;
   }
 };
 
@@ -519,6 +599,20 @@ onMounted(async () => {
   await fetchPetDetails();
   
   // init date
+  const today = new Date();
+  if (currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear()) {
+    selectDate(today.getDate());
+  }
+});
+
+// 月份切換時重新抓取月曆摘要（會先用快取顯示）
+watch(currentDate, async () => {
+  if (!pet.value) return;
+  selectedDay.value = null;
+  selectedDateObj.value = null;
+  void fetchPetDailyRecords();
+
+  // 只有在「切回今天所在月份」時，自動選取今天並顯示資料
   const today = new Date();
   if (currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear()) {
     selectDate(today.getDate());

@@ -239,6 +239,7 @@ import { notification } from 'src/boot/notification';
 import { useUserStore } from 'src/stores/userStore';
 import MediaUploader from 'src/components/MediaUploader.vue';
 import { uploadMediaFiles, getCleanMediaFiles } from 'src/services/mediaUploadService';
+import { cacheGet, cacheSet } from 'src/utils/idbCache';
 
 const props = defineProps({
   petId: {
@@ -258,6 +259,7 @@ const isUploading = ref(false);
 const isSaving = ref(false);
 const uploadProgress = ref(0);
 const originalData = ref(null);
+const currentRecordId = ref(null);
 
 // Form data
 const formData = reactive({
@@ -365,9 +367,9 @@ const loadDailyRecord = async (date) => {
     // Format date as YYYY-MM-DD for record ID
     const dateString = formatDate(date);
     const recordId = `${props.petId}_${dateString}`;
-    
-    const recordRef = doc(db, 'petDailyRecords', recordId);
-    const recordDoc = await getDoc(recordRef);
+    currentRecordId.value = recordId;
+
+    const cacheKey = `petDailyRecord:${userStore.family.id}:${recordId}`;
     
     // Default values
     const defaultData = {
@@ -386,6 +388,24 @@ const loadDailyRecord = async (date) => {
       notes: '',
       mediaFiles: [],
     };
+
+    // Cache-first：先用快取秒顯示，再抓 Firestore 更新最新
+    const cached = await cacheGet(cacheKey, { maxAgeMs: 1000 * 60 * 60 * 24 * 30 });
+    if (cached && typeof cached === 'object') {
+      Object.assign(formData, {
+        ...defaultData,
+        ...cached,
+        mediaFiles: (cached.mediaFiles || []).map(file => ({
+          ...file,
+          loading: false,
+          loadError: false
+        }))
+      });
+      originalData.value = JSON.parse(JSON.stringify(formData));
+    }
+
+    const recordRef = doc(db, 'petDailyRecords', recordId);
+    const recordDoc = await getDoc(recordRef);
     
     if (recordDoc.exists()) {
       // Load existing data
@@ -406,22 +426,41 @@ const loadDailyRecord = async (date) => {
       }));
       
       // Set form data
-      Object.assign(formData, {
-        ...defaultData,
-        ...recordData,
-        mediaFiles
+      // 若使用者已開始編輯，不用網路資料覆蓋
+      if (currentRecordId.value === recordId && !hasChanges.value) {
+        Object.assign(formData, {
+          ...defaultData,
+          ...recordData,
+          mediaFiles
+        });
+        // Save original data for change detection
+        originalData.value = JSON.parse(JSON.stringify(formData));
+      }
+
+      // Cache a sanitized shape (avoid Firestore Timestamp in cache)
+      const {...cacheSafeData } = recordData || {};
+      void cacheSet(cacheKey, {
+        ...cacheSafeData,
+        mediaFiles: (recordData.mediaFiles || []).map(file => ({
+          url: file?.url || null,
+          type: file?.type || 'image',
+          name: file?.name || 'file',
+          timestamp: file?.timestamp || Date.now()
+        })).filter(f => !!f.url)
       });
-      
-      // Save original data for change detection
-      originalData.value = JSON.parse(JSON.stringify(formData));
     } else {
       // Set to default values
-      Object.assign(formData, defaultData);
-      originalData.value = JSON.parse(JSON.stringify(defaultData));
+      if (!cached) {
+        Object.assign(formData, defaultData);
+        originalData.value = JSON.parse(JSON.stringify(defaultData));
+      }
     }
   } catch (error) {
     console.error('Failed to load daily record:', error);
-    notification.error('載入日期記錄失敗');
+    // 若已有快取顯示，離線/錯誤就先不干擾使用者
+    if (!originalData.value) {
+      notification.error('載入日期記錄失敗');
+    }
   }
 };
 
@@ -554,6 +593,19 @@ const saveRecord = async () => {
     
     // Save to Firestore
     await setDoc(doc(db, 'petDailyRecords', recordId), recordData);
+
+    // Update IndexedDB cache (fast switching / reopen)
+    const cacheKey = `petDailyRecord:${userStore.family.id}:${recordId}`;
+    const {...cacheSafeData } = recordData || {};
+    void cacheSet(cacheKey, {
+      ...cacheSafeData,
+      mediaFiles: (cleanMediaFiles || []).map(file => ({
+        url: file?.url || null,
+        type: file?.type || 'image',
+        name: file?.name || 'file',
+        timestamp: file?.timestamp || Date.now()
+      })).filter(f => !!f.url)
+    });
     // Keep local state consistent with what we saved (prevents reverting to old calories)
     formData.calories = recordData.calories;
     originalData.value = JSON.parse(JSON.stringify(formData));

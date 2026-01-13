@@ -338,6 +338,7 @@ import { deleteDoc, storage, storageRef, deleteObject } from 'src/boot/firebase'
 import { notification } from 'src/boot/notification';
 import { useUserStore } from 'src/stores/userStore';
 import { uploadPetFile } from 'src/services/petFileService';
+import { cacheGet, cacheSet } from 'src/utils/idbCache';
 
 const userStore = useUserStore();
 const route = useRoute();
@@ -509,6 +510,14 @@ const fetchFiles = async () => {
   if (!userStore.isLoggedIn || !userStore.hasFamily || !petId.value) return;
   loading.value = true;
   try {
+    const cacheKey = `petFiles:${userStore.family.id}:${petId.value}`;
+    const cached = await cacheGet(cacheKey, { maxAgeMs: 1000 * 60 * 60 * 24 });
+    if (Array.isArray(cached) && cached.length > 0) {
+      files.value = cached;
+      // 首屏先顯示快取，不要卡 loading
+      loading.value = false;
+    }
+
     const qy = query(
       collection(db, 'petFiles'),
       where('familyId', '==', userStore.family.id),
@@ -519,11 +528,19 @@ const fetchFiles = async () => {
       id: d.id,
       ...d.data()
     }));
+    // Avoid caching Vue reactive proxies / Firestore Timestamp objects directly
+    void cacheSet(cacheKey, files.value.map((f) => ({
+      ...f,
+      createdAt: f?.createdAt?.toMillis?.() ?? f?.createdAt ?? null
+    })));
   } catch (e) {
     console.error(e);
-    notification.error('載入檔案列表失敗');
+    // 有快取時（或離線）就先用快取顯示，不用跳錯誤擋使用者
+    if (files.value.length === 0) {
+      notification.error('載入檔案列表失敗');
+    }
   } finally {
-    loading.value = false;
+    if (loading.value) loading.value = false;
   }
 };
 

@@ -242,6 +242,7 @@ const selectedDay = ref(null);
 const selectedDateObj = ref(null);
 const dailyRecords = reactive({});
 const showDataChart = ref(false);
+const fetchRecordsSeq = ref(0);
 
 const monthKey = computed(() => {
   return `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`;
@@ -416,12 +417,16 @@ const fetchPetDailyRecords = async () => {
   if (!pet.value || !userStore.hasFamily) return;
   
   try {
+    const seq = ++fetchRecordsSeq.value;
+    const expectedMonthKey = monthKey.value;
     const cacheKey = `petDailySummary:${userStore.family.id}:${pet.value.id}:${monthKey.value}`;
 
     // 先用快取秒顯示
     const cached = await cacheGet(cacheKey, { maxAgeMs: 1000 * 60 * 60 * 24 * 30 });
     const hadCached = !!(cached && typeof cached === 'object');
     if (cached && typeof cached === 'object') {
+      // 若已經切到別的月份/有新請求，這次就不要動 UI
+      if (seq !== fetchRecordsSeq.value || monthKey.value !== expectedMonthKey) return;
       Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
       Object.entries(cached).forEach(([date, summary]) => {
         dailyRecords[date] = summary;
@@ -445,6 +450,7 @@ const fetchPetDailyRecords = async () => {
       );
 
       const querySnapshot = await getDocs(petRecordsQuery);
+      if (seq !== fetchRecordsSeq.value || monthKey.value !== expectedMonthKey) return;
       Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
 
       querySnapshot.forEach((d) => {
@@ -513,12 +519,14 @@ const fetchPetDailyRecords = async () => {
 
     const gotAny = Object.keys(tempRecords).length > 0;
     if (gotAny) {
+      if (seq !== fetchRecordsSeq.value || monthKey.value !== expectedMonthKey) return;
       Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
       Object.entries(tempRecords).forEach(([date, summary]) => {
         dailyRecords[date] = summary;
       });
       void cacheSet(cacheKey, summaryForCache);
     } else if (!hadCached) {
+      if (seq !== fetchRecordsSeq.value || monthKey.value !== expectedMonthKey) return;
       Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
     }
   } catch (error) {

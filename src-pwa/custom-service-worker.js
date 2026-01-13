@@ -9,6 +9,9 @@
 import { clientsClaim } from 'workbox-core'
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching'
 import { registerRoute, NavigationRoute } from 'workbox-routing'
+import { NetworkOnly, StaleWhileRevalidate, CacheFirst } from 'workbox-strategies'
+import { ExpirationPlugin } from 'workbox-expiration'
+import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 
 self.skipWaiting()
 clientsClaim()
@@ -29,102 +32,66 @@ if (process.env.MODE !== 'ssr' || process.env.PROD) {
   )
 }
 
-/*
- * This file (custom-service-worker.js) is used to customize your service worker.
+/**
+ * Runtime caching policy
+ *
+ * 1) Firebase APIs MUST NOT be cached by the SW (avoid token/staleness/inconsistency).
+ *    App-level caching is handled via IndexedDB in the application code.
+ *
+ * 2) Only cache static assets/images with TTL + max entries to prevent cache bloat.
  */
 
-const CACHE_PREFIX = 'meow-log-cache';
+// Never cache Firestore API responses
+registerRoute(
+  ({ url }) => url.hostname === 'firestore.googleapis.com',
+  new NetworkOnly()
+)
 
-const SHELL_CACHE = `${CACHE_PREFIX}-shell-v1`;
+// Never cache Firebase Storage API responses (download URLs include tokens and can be huge)
+registerRoute(
+  ({ url }) => url.hostname === 'firebasestorage.googleapis.com',
+  new NetworkOnly()
+)
 
-const DATA_CACHE = `${CACHE_PREFIX}-data-v1`;
+// Same-origin scripts/styles/workers: fast updates without going stale forever
+registerRoute(
+  ({ request, url }) =>
+    url.origin === self.location.origin &&
+    (request.destination === 'script' ||
+      request.destination === 'style' ||
+      request.destination === 'worker'),
+  new StaleWhileRevalidate({
+    cacheName: 'meow-log-assets',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [200] }),
+      new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 7 })
+    ]
+  })
+)
 
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/app.css',
-  '/js/app.js',
-  '/icons/favicon-16x16.png',
-  '/icons/favicon-32x32.png',
-  '/icons/favicon-96x96.png',
-];
+// Images (icons/photos): cache-first with eviction
+registerRoute(
+  ({ request }) => request.destination === 'image',
+  new CacheFirst({
+    cacheName: 'meow-log-images',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [200] }),
+      new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 14 })
+    ]
+  })
+)
 
-// Install
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(SHELL_CACHE)
-      .then((cache) => {
-        console.log('caching shell files');
-        return cache.addAll(STATIC_ASSETS);
-      })
-      .then(() => {
-        return self.skipWaiting();
-      })
-  );
-});
-
-// Activate 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keyList) => {
-      return Promise.all(keyList.map((key) => {
-        if (key !== SHELL_CACHE && key !== DATA_CACHE && 
-            key.startsWith(CACHE_PREFIX)) {
-          console.log('Removing old cache', key);
-          return caches.delete(key);
-        }
-      }));
-    })
-    .then(() => {
-      return self.clients.claim();
-    })
-  );
-});
-
-// Intercept requests
-self.addEventListener('fetch', (event) => {
-  // Skip requests that don't support caching
-  if (!event.request.url.startsWith('http')) {
-    return;
-  }
-
-  // Firebase API request handling
-  if (event.request.url.includes('firestore.googleapis.com') || 
-      event.request.url.includes('firebasestorage.googleapis.com')) {
-    event.respondWith(
-      caches.open(DATA_CACHE).then((cache) => {
-        return fetch(event.request)
-          .then((response) => {
-            // If successful, clone and store the response in the cache
-            if (response.status === 200) {
-              cache.put(event.request.url, response.clone());
-            }
-            return response;
-          })
-          .catch(() => {
-            // Network request failed, try to provide from cache
-            return cache.match(event.request);
-          });
-      })
-    );
-  } else {
-    // Static assets use "cache first, network fallback" strategy
-    event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || fetch(event.request)
-          .then((fetchResponse) => {
-            // For navigation requests, always refresh the cache
-            if (event.request.mode === 'navigate') {
-              caches.open(SHELL_CACHE).then((cache) => {
-                cache.put(event.request, fetchResponse.clone());
-              });
-            }
-            return fetchResponse;
-          });
-      })
-    );
-  }
-});
+// Fonts: cache-first (rarely change)
+registerRoute(
+  ({ request }) => request.destination === 'font',
+  new CacheFirst({
+    cacheName: 'meow-log-fonts',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [200] }),
+      new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 })
+    ]
+  })
+)
 
 // Background Sync
 self.addEventListener('sync', (event) => {

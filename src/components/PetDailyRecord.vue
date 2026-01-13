@@ -260,6 +260,7 @@ const isSaving = ref(false);
 const uploadProgress = ref(0);
 const originalData = ref(null);
 const currentRecordId = ref(null);
+const loadSeq = ref(0);
 
 // Form data
 const formData = reactive({
@@ -364,6 +365,7 @@ const loadDailyRecord = async (date) => {
   if (!userStore.isLoggedIn || !userStore.hasFamily || !props.petId) return;
   
   try {
+    const seq = ++loadSeq.value;
     // Format date as YYYY-MM-DD for record ID
     const dateString = formatDate(date);
     const recordId = `${props.petId}_${dateString}`;
@@ -427,7 +429,7 @@ const loadDailyRecord = async (date) => {
       
       // Set form data
       // 若使用者已開始編輯，不用網路資料覆蓋
-      if (currentRecordId.value === recordId && !hasChanges.value) {
+      if (seq === loadSeq.value && currentRecordId.value === recordId && !hasChanges.value) {
         Object.assign(formData, {
           ...defaultData,
           ...recordData,
@@ -450,7 +452,7 @@ const loadDailyRecord = async (date) => {
       });
     } else {
       // Set to default values
-      if (!cached) {
+      if (seq === loadSeq.value && !cached) {
         Object.assign(formData, defaultData);
         originalData.value = JSON.parse(JSON.stringify(defaultData));
       }
@@ -606,6 +608,33 @@ const saveRecord = async () => {
         timestamp: file?.timestamp || Date.now()
       })).filter(f => !!f.url)
     });
+
+    // Strong consistency: also update the monthly calendar summary cache immediately
+    // so the calendar badges match the saved record without waiting for background refresh.
+    try {
+      const ym = String(dateString || '').slice(0, 7); // YYYY-MM
+      const summaryKey = `petDailySummary:${userStore.family.id}:${props.petId}:${ym}`;
+      const existing = (await cacheGet(summaryKey, { maxAgeMs: 1000 * 60 * 60 * 24 * 30 })) || {};
+
+      const tags = recordData.tags || (recordData.tag ? [recordData.tag] : []);
+      const summary = {
+        hasRecord: true,
+        tag: recordData.tag || null,
+        tags,
+        hasNotes: !!recordData.notes,
+        hasVomit: recordData.hasVomit || false,
+        hasDiarrhea: recordData.hasDiarrhea || false,
+        dailyWeight: recordData.dailyWeight || null,
+        temperature: recordData.temperature || null
+      };
+
+      // merge into month map (keyed by YYYY-MM-DD)
+      const merged = { ...(existing && typeof existing === 'object' ? existing : {}) };
+      merged[dateString] = summary;
+      void cacheSet(summaryKey, merged);
+    } catch {
+      // best-effort; do not block save UX
+    }
     // Keep local state consistent with what we saved (prevents reverting to old calories)
     formData.calories = recordData.calories;
     originalData.value = JSON.parse(JSON.stringify(formData));

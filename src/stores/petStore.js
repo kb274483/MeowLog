@@ -20,6 +20,12 @@ export const usePetStore = defineStore('pet', () => {
   const pets = ref([]);
   const loading = ref(false);
   const userStore = useUserStore();
+
+  const persistPetsCache = () => {
+    if (!userStore?.family?.id) return;
+    const cacheKey = `pets:${userStore.family.id}`;
+    void cacheSet(cacheKey, pets.value);
+  };
   
   // Calculate age from birthDate
   const calculateAge = (birthDate) => {
@@ -113,6 +119,16 @@ export const usePetStore = defineStore('pet', () => {
         birthDate: birthDate,
         updatedAt: serverTimestamp()
       });
+      // Keep cache strongly consistent with local state if possible
+      const idx = pets.value.findIndex(p => p.id === petId);
+      if (idx !== -1) {
+        pets.value[idx] = {
+          ...pets.value[idx],
+          birthDate,
+          updatedAt: new Date()
+        };
+        persistPetsCache();
+      }
       return true;
     } catch (error) {
       console.error('Failed to update pet birthDate:', error);
@@ -152,6 +168,7 @@ export const usePetStore = defineStore('pet', () => {
       
       // update data
       pets.value.push(addedPet);
+      persistPetsCache();
       
       return addedPet;
     } catch (error) {
@@ -185,6 +202,7 @@ export const usePetStore = defineStore('pet', () => {
           ...updatedData,
           updatedAt: new Date()
         };
+        persistPetsCache();
       }
       
       return true;
@@ -203,6 +221,7 @@ export const usePetStore = defineStore('pet', () => {
       const petIndex = pets.value.findIndex(p => p.id === petId);
       if (petIndex !== -1) {
         pets.value.splice(petIndex, 1);
+        persistPetsCache();
       }
       
       return true;

@@ -374,6 +374,8 @@ const pointers = ref(new Map());
 const pointerGesture = ref(null);
 const showShareDialog = ref(false);
 const shareUrl = ref('');
+const isSharing = ref(false);
+let shareUnlockTimer = null;
 
 const showDeleteDialog = ref(false);
 const fileToDelete = ref(null);
@@ -863,7 +865,15 @@ const copyShareUrl = async () => {
   }
 };
 
-const shareFile = async () => {
+const unlockShareSoon = () => {
+  if (shareUnlockTimer) clearTimeout(shareUnlockTimer);
+  shareUnlockTimer = setTimeout(() => {
+    isSharing.value = false;
+    shareUnlockTimer = null;
+  }, 800);
+};
+
+const shareFileImpl = async () => {
   if (!viewingFile.value?.url) return;
   const url = viewingFile.value.url;
   const title = viewingFile.value.name || '檔案';
@@ -906,6 +916,21 @@ const shareFile = async () => {
   } catch (e) {
     console.error(e);
     openShareDialog(url);
+  }
+};
+
+const shareFile = async () => {
+  if (isSharing.value) return;
+  isSharing.value = true;
+  if (shareUnlockTimer) {
+    clearTimeout(shareUnlockTimer);
+    shareUnlockTimer = null;
+  }
+
+  try {
+    await shareFileImpl();
+  } finally {
+    unlockShareSoon();
   }
 };
 

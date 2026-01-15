@@ -43,7 +43,7 @@
     >
       <!-- close -->
       <button 
-        class="absolute top-16 right-4 text-white bg-black/50 rounded-full w-10 h-10 flex items-center justify-center"
+        class="absolute top-16 right-4 text-white bg-black/50 rounded-full w-10 h-10 flex items-center justify-center z-50"
         @click.stop="closeFullscreen"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -83,6 +83,17 @@
         @click.stop
         autoplay
       ></video>
+
+      <!-- fullscreen pdf/file placeholder -->
+      <div v-else class="text-white text-center p-4">
+        <q-icon 
+          :name="fullscreenMedia.type === 'pdf' ? 'picture_as_pdf' : 'insert_drive_file'" 
+          size="64px" 
+          class="mb-4"
+        />
+        <div class="text-lg font-bold mb-2">{{ fullscreenMedia.name }}</div>
+        <div class="text-sm text-gray-300">預覽模式僅支援圖片與影片</div>
+      </div>
       
       <!-- fullscreen loading -->
       <div v-if="fullscreenLoading" class="absolute inset-0 flex items-center justify-center">
@@ -118,7 +129,24 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14v-4z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
-            <span class="text-xs block truncate">{{ file.name || '影片' }}</span>
+            <span class="text-xs block truncate px-1">{{ file.name || '影片' }}</span>
+          </div>
+        </div>
+
+        <!-- pdf/file preview -->
+        <div 
+          v-else
+          class="w-full h-full bg-gray-50 flex items-center justify-center border border-gray-100"
+          @click.stop="openFullscreen(file)"
+        >
+          <div class="text-center w-full px-1">
+            <q-icon 
+              :name="file.type === 'pdf' ? 'picture_as_pdf' : 'insert_drive_file'" 
+              size="32px" 
+              :color="file.type === 'pdf' ? 'red-5' : 'grey-6'" 
+              class="mb-1"
+            />
+            <div class="text-xs text-gray-600 truncate w-full">{{ file.name || '檔案' }}</div>
           </div>
         </div>
         
@@ -467,18 +495,9 @@ const handleFileChange = (event) => {
   const files = event.target.files;
   if (!files || files.length === 0) return;
   
-  console.log(`選擇了 ${files.length} 個文件`);
-  
-  // 檢查檔案類型
-  const invalidFiles = Array.from(files).filter(file => {
-    const fileType = file.type.toLowerCase();
-    return !(fileType.startsWith('image/') || fileType.startsWith('video/'));
-  });
-  
-  if (invalidFiles.length > 0) {
-    notification.error('請選擇圖片或影片文件');
-    return;
-  }
+  // const invalidFiles = Array.from(files).filter(file => {
+  //   return false; 
+  // });
   
   // 將檔案轉換為預覽格式
   const newMediaFiles = Array.from(files).map(file => {
@@ -487,11 +506,16 @@ const handleFileChange = (event) => {
     // 創建一個URL用於預覽
     const previewURL = URL.createObjectURL(file);
     
+    let type = 'file';
+    if (file.type.startsWith('image/')) type = 'image';
+    else if (file.type.startsWith('video/')) type = 'video';
+    else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) type = 'pdf';
+
     return {
       isNew: true,
       file: file, // 確保存儲原始文件對象
       url: previewURL,
-      type: file.type.startsWith('video/') ? 'video' : 'image',
+      type: type,
       name: file.name,
       loading: false,
       loadError: false,

@@ -1,7 +1,7 @@
 // firebase.js
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, doc, getDoc, setDoc, addDoc, query, where, getDocs, serverTimestamp, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDoc, setDoc, addDoc, query, where, getDocs, serverTimestamp, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -40,6 +40,8 @@ export {
   serverTimestamp,
   updateDoc,
   deleteDoc,
+  arrayUnion,
+  arrayRemove,
   storage,
   storageRef,
   uploadBytesResumable,

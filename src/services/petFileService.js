@@ -26,7 +26,7 @@ export const getFileCategory = (file) => {
  * @param {File} file
  * @param {Object} options { familyId, petId }
  * @param {Function} progressCallback (0-100)
- * @returns {Promise<{ url: string, storagePath: string, fileCategory: string, mimeType: string, size: number }>}
+ * @returns {Promise<{ url: string, storagePath: string, fileCategory: string, mimeType: string, size: number, originalName: string }>}
  */
 export const uploadPetFile = async (file, options, progressCallback) => {
   if (!file) throw new Error('invalid file');
@@ -75,10 +75,45 @@ export const uploadPetFile = async (file, options, progressCallback) => {
           storagePath,
           fileCategory,
           mimeType: file.type || null,
-          size: file.size || null
+          size: file.size || null,
+          originalName: file.name
         });
       }
     );
   });
 };
 
+/**
+ * Upload multiple pet files
+ * @param {Array<File>} files
+ * @param {Object} options
+ * @param {Function} progressCallback (overall progress 0-100)
+ */
+export const uploadPetFiles = async (files, options, progressCallback) => {
+  if (!files || !files.length) return [];
+  
+  const results = [];
+  let completedCount = 0;
+  const total = files.length;
+
+  for (const file of files) {
+    try {
+      // Individual file progress contributes to overall progress
+      // Simplified: Just count completed files for now to avoid complexity
+      // Ideally we would sum up bytes, but sequentially is easier to track by count
+      const result = await uploadPetFile(file, options, () => {
+        // Optional: finer grain progress logic could go here
+      });
+      results.push(result);
+    } catch (e) {
+      console.error('Single file upload failed:', e);
+      // We continue uploading others even if one fails
+      results.push({ error: e, name: file.name });
+    }
+    completedCount++;
+    if (progressCallback) {
+      progressCallback(Math.round((completedCount / total) * 100));
+    }
+  }
+  return results;
+};

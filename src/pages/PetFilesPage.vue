@@ -278,11 +278,18 @@
 
         <q-card-section class="flex-grow flex flex-col items-center justify-center relative overflow-hidden p-0 bg-black">
           <!-- Main Content -->
-          <div class="w-full h-full flex items-center justify-center">
+          <div 
+            class="w-full h-full flex items-center justify-center"
+            @touchstart="onViewerTouchStart"
+            @touchmove="onViewerTouchMove"
+            @touchend="onViewerTouchEnd"
+          >
             <img
               v-if="isImage(viewingFile)"
               :src="viewingFile.url"
-              class="max-h-full max-w-full object-contain select-none"
+              class="max-h-full max-w-full object-contain select-none origin-center"
+              :style="viewerImageStyle"
+              draggable="false"
             />
             <iframe
               v-else-if="isPdf(viewingFile)"
@@ -690,35 +697,120 @@ const executeDeleteFile = async (record, file, idx) => {
 };
 
 // Viewer
-const viewingRecord = ref(null); // 當前正在檢視的紀錄（資料夾）
+const viewingRecord = ref(null);
+const viewerImageStyle = computed(() => {
+  return {
+    transform: `translate(${pointerState.value.x}px, ${pointerState.value.y}px) scale(${pointerState.value.scale})`,
+    transition: pointerState.value.isGesturing ? 'none' : 'transform 0.2s ease-out',
+    touchAction: 'none' // 重要：防止瀏覽器預設捲動
+  };
+});
+
+// Zoom & Pan Logic
+const pointerState = ref({
+  scale: 1,
+  x: 0,
+  y: 0,
+  startX: 0,
+  startY: 0,
+  startScale: 1,
+  isGesturing: false
+});
+
+let lastDistance = 0;
+
+const resetZoom = () => {
+  pointerState.value = {
+    scale: 1,
+    x: 0,
+    y: 0,
+    startX: 0,
+    startY: 0,
+    startScale: 1,
+    isGesturing: false
+  };
+};
+
+const onViewerTouchStart = (e) => {
+  if (e.touches.length === 2) {
+    // 雙指：開始縮放
+    pointerState.value.isGesturing = true;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastDistance = Math.sqrt(dx * dx + dy * dy);
+    pointerState.value.startScale = pointerState.value.scale;
+  } else if (e.touches.length === 1 && pointerState.value.scale > 1) {
+    // 單指且已放大：開始平移
+    pointerState.value.isGesturing = true;
+    pointerState.value.startX = e.touches[0].clientX - pointerState.value.x;
+    pointerState.value.startY = e.touches[0].clientY - pointerState.value.y;
+  }
+};
+
+const onViewerTouchMove = (e) => {
+  if (!pointerState.value.isGesturing) return;
+  e.preventDefault(); // 防止背景捲動
+
+  if (e.touches.length === 2) {
+    // 雙指縮放
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (lastDistance > 0) {
+      const ratio = distance / lastDistance;
+      const newScale = Math.min(Math.max(pointerState.value.startScale * ratio, 1), 4); // 限制 1x ~ 4x
+      pointerState.value.scale = newScale;
+    }
+  } else if (e.touches.length === 1 && pointerState.value.scale > 1) {
+    // 單指平移 (限制在放大模式下)
+    pointerState.value.x = e.touches[0].clientX - pointerState.value.startX;
+    pointerState.value.y = e.touches[0].clientY - pointerState.value.startY;
+  }
+};
+
+const onViewerTouchEnd = () => {
+  pointerState.value.isGesturing = false;
+  if (pointerState.value.scale < 1.1) {
+    // 如果縮放太小，自動彈回原始大小並重置位置
+    resetZoom();
+  }
+};
 
 const openViewer = (file, record) => {
   viewingFile.value = file;
   viewingRecord.value = record;
   showViewer.value = true;
+  resetZoom(); // 每次開啟重置
 };
 
 // 切換上一張/下一張
 const hasPrev = computed(() => {
   if (!viewingRecord.value || !viewingFile.value) return false;
+  // 放大時隱藏切換按鈕，避免誤觸
+  if (pointerState.value.scale > 1.1) return false;
   const idx = viewingRecord.value.files.indexOf(viewingFile.value);
   return idx > 0;
 });
 
 const hasNext = computed(() => {
   if (!viewingRecord.value || !viewingFile.value) return false;
+  // 放大時隱藏切換按鈕，避免誤觸
+  if (pointerState.value.scale > 1.1) return false;
   const idx = viewingRecord.value.files.indexOf(viewingFile.value);
   return idx !== -1 && idx < viewingRecord.value.files.length - 1;
 });
 
 const prevFile = () => {
   if (!hasPrev.value) return;
+  resetZoom(); // 切換時重置縮放
   const idx = viewingRecord.value.files.indexOf(viewingFile.value);
   viewingFile.value = viewingRecord.value.files[idx - 1];
 };
 
 const nextFile = () => {
   if (!hasNext.value) return;
+  resetZoom(); // 切換時重置縮放
   const idx = viewingRecord.value.files.indexOf(viewingFile.value);
   viewingFile.value = viewingRecord.value.files[idx + 1];
 };

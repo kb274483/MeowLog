@@ -185,6 +185,7 @@
 <script setup>
 import { ref, onBeforeUnmount, nextTick, computed } from 'vue';
 import { notification } from 'src/boot/notification';
+import { compressImage } from 'src/utils/imageCompression';
 
 const props = defineProps({
   modelValue: {
@@ -218,7 +219,6 @@ const objectUrls = ref([]);
 const fullscreenMedia = ref(null);
 const fullscreenLoading = ref(false);
 const fullscreenImageViewport = ref(null);
-const fullscreenImageEl = ref(null);
 
 // fullscreen zoom/pan state (for images)
 const zoomScale = ref(1);
@@ -490,52 +490,70 @@ const closeFullscreen = () => {
   document.body.style.overflow = '';
 };
 
-// improve HEIC processing logic
-const handleFileChange = (event) => {
-  const files = event.target.files;
-  if (!files || files.length === 0) return;
-  
-  // const invalidFiles = Array.from(files).filter(file => {
-  //   return false; 
-  // });
-  
-  // 將檔案轉換為預覽格式
-  const newMediaFiles = Array.from(files).map(file => {
-    console.log('處理文件:', file.name, file.type, file.size);
-    
-    // 創建一個URL用於預覽
-    const previewURL = URL.createObjectURL(file);
-    
-    let type = 'file';
-    if (file.type.startsWith('image/')) type = 'image';
-    else if (file.type.startsWith('video/')) type = 'video';
-    else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) type = 'pdf';
+  // 處理文件壓縮
+  const processFiles = async (files) => {
+    return Promise.all(
+      files.map(async (file) => {
+        console.log('處理文件:', file.name, file.type, file.size);
+        
+        let processedFile = file;
+        let type = 'file';
+        
+        if (file.type.startsWith('image/')) {
+          type = 'image';
+          try {
+            console.log('Compressing preview image...');
+            processedFile = await compressImage(file);
+            console.log(`Compressed size: ${(processedFile.size / 1024 / 1024).toFixed(2)} MB`);
+          } catch (e) {
+            console.warn('Compression failed, using original', e);
+          }
+        } else if (file.type.startsWith('video/')) {
+          type = 'video';
+        } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+          type = 'pdf';
+        }
 
-    return {
-      isNew: true,
-      file: file, // 確保存儲原始文件對象
-      url: previewURL,
-      type: type,
-      name: file.name,
-      loading: false,
-      loadError: false,
-      timestamp: Date.now()
-    };
-  });
-  
-  console.log('創建的新媒體文件:', newMediaFiles);
-  
-  // 更新modelValue
-  emit('update:modelValue', [...props.modelValue, ...newMediaFiles]);
-  
-  // 重置input以允許再次選擇相同的文件
-  if (fileInput.value) {
-    fileInput.value.value = '';
-  }
-  
-  // 通知父元件文件已變更
-  emit('file-change', newMediaFiles);
-};
+        // 創建一個URL用於預覽
+        const previewURL = URL.createObjectURL(processedFile);
+
+        return {
+          isNew: true,
+          file: processedFile, // 確保存儲處理後的文件對象
+          url: previewURL,
+          type: type,
+          name: file.name,
+          loading: false,
+          loadError: false,
+          timestamp: Date.now()
+        };
+      })
+    );
+  };
+
+  // improve HEIC processing logic
+  const handleFileChange = async (event) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    console.log(`選擇了 ${files.length} 個文件`);
+    
+    // 將檔案轉換為預覽格式並壓縮
+    const newMediaFiles = await processFiles(Array.from(files));
+    
+    console.log('創建的新媒體文件:', newMediaFiles);
+    
+    // 更新modelValue
+    emit('update:modelValue', [...props.modelValue, ...newMediaFiles]);
+    
+    // 重置input以允許再次選擇相同的文件
+    if (fileInput.value) {
+      fileInput.value.value = '';
+    }
+    
+    // 通知父元件文件已變更
+    emit('file-change', newMediaFiles);
+  };
 
 // improve image load error handling
 const handleImageError = (file, index) => {

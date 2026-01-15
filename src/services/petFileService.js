@@ -4,6 +4,7 @@ import {
   uploadBytesResumable,
   getDownloadURL
 } from 'src/boot/firebase';
+import { compressImage } from 'src/utils/imageCompression';
 
 const sanitizeFileName = (name) => {
   if (!name) return `file_${Date.now()}`;
@@ -44,7 +45,19 @@ export const uploadPetFile = async (file, options, progressCallback) => {
 
   let uploadTask;
   try {
-    uploadTask = uploadBytesResumable(fileRef, file);
+    // 嘗試壓縮圖片
+    let fileToUpload = file;
+    if (fileCategory === 'image') {
+      try {
+        console.log(`Compressing image: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+        fileToUpload = await compressImage(file);
+        console.log(`Compressed size: ${(fileToUpload.size / 1024 / 1024).toFixed(2)} MB`);
+      } catch (compErr) {
+        console.warn('Compression skipped:', compErr);
+      }
+    }
+
+    uploadTask = uploadBytesResumable(fileRef, fileToUpload);
   } catch (uploadError) {
     // fallback: read as ArrayBuffer
     console.error('Upload failed, trying to read file content:', uploadError);

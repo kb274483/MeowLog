@@ -290,7 +290,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, watch } from 'vue'
 import { auth, provider, signInWithPopup } from 'src/boot/firebase'
 import { useUserStore } from 'src/stores/userStore'
 import { usePetStore } from 'src/stores/petStore'
@@ -328,6 +328,16 @@ const familySettings = reactive({
   wetFoodCalories: null,
   dryFoodCalories: null
 })
+
+// 當登入後 family 載入完成時，主動 fetch 寵物列表（解決登入後列表為空的問題）
+watch(
+  () => userStore.hasFamily,
+  (hasFamily) => {
+    if (hasFamily && userStore.isLoggedIn) {
+      void petStore.fetchFamilyPets()
+    }
+  },
+)
 
 // Init auth on component mount
 onMounted(async () => {

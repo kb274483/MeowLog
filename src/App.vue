@@ -57,6 +57,8 @@ const handlePageHide = () => {
 }
 
 onMounted(() => {
+  const loadingEl = document.getElementById('app-loading')
+  if (loadingEl) loadingEl.remove()
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('pagehide', handlePageHide)
 })

@@ -1,20 +1,21 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { 
-  auth, 
-  onAuthStateChanged, 
-  db, 
-  doc, 
-  getDoc, 
-  collection, 
-  query, 
-  where, 
+import {
+  auth,
+  onAuthStateChanged,
+  db,
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
   getDocs,
   addDoc,
   setDoc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
 } from 'src/boot/firebase'
+import { clearSnapshot } from 'src/services/appSnapshotService'
 
 export const useUserStore = defineStore('user', () => {
   // State
@@ -28,9 +29,19 @@ export const useUserStore = defineStore('user', () => {
   const userId = computed(() => user.value?.uid)
 
   // Actions
+  // Hydrate from snapshot (for fast initial paint)
+  const hydrateFromSnapshot = (snapshot) => {
+    if (!snapshot?.userId) return false
+    if (snapshot.user) user.value = snapshot.user
+    if (snapshot.family !== undefined) family.value = snapshot.family
+    return true
+  }
+
   // Initialize auth state listener
-  const initAuth = () => {
-    loading.value = true
+  // options.background: when true, do not touch loading (for stale-while-revalidate)
+  const initAuth = (options = {}) => {
+    const isBackground = !!options.background
+    if (!isBackground) loading.value = true
     return new Promise((resolve) => {
       onAuthStateChanged(auth, async (userData) => {
         if (userData) {
@@ -40,9 +51,10 @@ export const useUserStore = defineStore('user', () => {
         } else {
           user.value = null
           family.value = null
+          void clearSnapshot()
           resolve(null)
         }
-        loading.value = false
+        if (!isBackground) loading.value = false
       })
     })
   }
@@ -56,28 +68,28 @@ export const useUserStore = defineStore('user', () => {
       const userFamiliesQuery = query(
         collection(db, 'familyMembers'),
         where('userId', '==', user.value.uid),
-        where('active', '!=', false)
+        where('active', '!=', false),
       )
-      
+
       const querySnapshot = await getDocs(userFamiliesQuery)
-      
+
       if (!querySnapshot.empty) {
         // User belongs to at least one family
         const familyMember = querySnapshot.docs[0].data()
-        
+
         // Get the family details
         const familyDoc = await getDoc(doc(db, 'families', familyMember.familyId))
-        
+
         if (familyDoc.exists()) {
           family.value = {
             id: familyDoc.id,
-            ...familyDoc.data()
+            ...familyDoc.data(),
           }
         }
       } else {
         family.value = null
       }
-      
+
       return family.value
     } catch (error) {
       console.error('Load family data failed', error)
@@ -93,33 +105,33 @@ export const useUserStore = defineStore('user', () => {
     try {
       const simpleData = {
         name: familyName,
-        createdBy: user.value.uid
-      };
-      
-      const newFamilyRef = await addDoc(collection(db, 'families'), simpleData);
-      
-      const memberDocId = `${user.value.uid}_${newFamilyRef.id}`;
-      
+        createdBy: user.value.uid,
+      }
+
+      const newFamilyRef = await addDoc(collection(db, 'families'), simpleData)
+
+      const memberDocId = `${user.value.uid}_${newFamilyRef.id}`
+
       const memberData = {
         familyId: newFamilyRef.id,
         userId: user.value.uid,
         role: 'admin',
         active: true,
-        joinedAt: serverTimestamp()
-      };
-      
-      await setDoc(doc(db, 'familyMembers', memberDocId), memberData);
-      await loadUserFamily();
-      
+        joinedAt: serverTimestamp(),
+      }
+
+      await setDoc(doc(db, 'familyMembers', memberDocId), memberData)
+      await loadUserFamily()
+
       // Add explicit check
       if (!family.value) {
-        console.error('Failed to get family data after creating');
-        return false;
+        console.error('Failed to get family data after creating')
+        return false
       }
-      return family.value;
+      return family.value
     } catch (error) {
-      console.error('Create family failed', error);
-      throw error;
+      console.error('Create family failed', error)
+      throw error
     }
   }
 
@@ -131,7 +143,7 @@ export const useUserStore = defineStore('user', () => {
       // Check if family exists
       const familyRef = doc(db, 'families', familyId)
       const familyDoc = await getDoc(familyRef)
-      
+
       if (!familyDoc.exists()) {
         throw new Error('Family does not exist')
       }
@@ -139,7 +151,7 @@ export const useUserStore = defineStore('user', () => {
       // Check if user is already a member
       const memberDocId = `${user.value.uid}_${familyId}`
       const memberDoc = await getDoc(doc(db, 'familyMembers', memberDocId))
-      
+
       if (memberDoc.exists()) {
         throw new Error('You are already a member of this family')
       }
@@ -155,33 +167,38 @@ export const useUserStore = defineStore('user', () => {
 
       // Load the joined family
       await loadUserFamily()
-      
+
       return family.value
     } catch (error) {
       console.error('Join family failed', error)
       return null
     }
   }
-  
+
   // Leave current family
   const leaveFamily = async () => {
     if (!user.value || !family.value) return false
-    
+
     try {
       // Get the member document ID
       const memberDocId = `${user.value.uid}_${family.value.id}`
-      
+
       // Delete the member document
-      await setDoc(doc(db, 'familyMembers', memberDocId), {
-        familyId: family.value.id,
-        userId: user.value.uid,
-        leftAt: serverTimestamp(),
-        active: false
-      }, { merge: true })
-      
+      await setDoc(
+        doc(db, 'familyMembers', memberDocId),
+        {
+          familyId: family.value.id,
+          userId: user.value.uid,
+          leftAt: serverTimestamp(),
+          active: false,
+        },
+        { merge: true },
+      )
+
       // Update local state
       family.value = null
-      
+      void clearSnapshot()
+
       return true
     } catch (error) {
       console.error('Leave family failed', error)
@@ -192,21 +209,21 @@ export const useUserStore = defineStore('user', () => {
   // Update family settings
   const updateFamilySettings = async (settings) => {
     if (!user.value || !family.value) return false
-    
+
     try {
       const familyRef = doc(db, 'families', family.value.id)
-      
+
       await updateDoc(familyRef, {
         ...settings,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       })
-      
+
       // Update local state
       family.value = {
         ...family.value,
-        ...settings
+        ...settings,
       }
-      
+
       return true
     } catch (error) {
       console.error('Update family settings failed', error)
@@ -219,18 +236,19 @@ export const useUserStore = defineStore('user', () => {
     user,
     family,
     loading,
-    
+
     // Getters
     isLoggedIn,
     hasFamily,
     userId,
-    
+
     // Actions
+    hydrateFromSnapshot,
     initAuth,
     loadUserFamily,
     createFamily,
     joinFamily,
     leaveFamily,
-    updateFamilySettings
+    updateFamilySettings,
   }
-}) 
+})

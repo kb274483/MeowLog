@@ -202,7 +202,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { usePetStore } from 'src/stores/petStore';
 import { useUserStore } from 'src/stores/userStore';
@@ -212,6 +212,7 @@ import PetDataChartDialog from 'src/components/PetDataChartDialog.vue';
 import { db, collection, query, where, getDocs, doc, getDoc } from 'src/boot/firebase';
 import { orderBy } from 'firebase/firestore';
 import { cacheGet, cacheSet } from 'src/utils/idbCache';
+import { loadAppSnapshot, updateLastViewedPet } from 'src/services/appSnapshotService';
 
 const route = useRoute();
 const router = useRouter();
@@ -412,6 +413,14 @@ const formatDate = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const updateAppSnapshotWithRecords = () => {
+  if (!pet.value || !userStore.hasFamily) return;
+  const recordsPlain = {};
+  Object.keys(dailyRecords).forEach(k => { recordsPlain[k] = dailyRecords[k]; });
+  petStore.lastViewedPetForSnapshot = { petId: pet.value.id, monthKey: monthKey.value, dailyRecords: recordsPlain, pet: { ...pet.value } };
+  void updateLastViewedPet(pet.value.id, monthKey.value, recordsPlain, { ...pet.value });
+};
+
 // fetch pet daily records
 const fetchPetDailyRecords = async () => {
   if (!pet.value || !userStore.hasFamily) return;
@@ -431,6 +440,7 @@ const fetchPetDailyRecords = async () => {
       Object.entries(cached).forEach(([date, summary]) => {
         dailyRecords[date] = summary;
       });
+      updateAppSnapshotWithRecords();
     }
 
     const monthStart = `${monthKey.value}-01`;
@@ -476,6 +486,7 @@ const fetchPetDailyRecords = async () => {
       });
 
       void cacheSet(cacheKey, summaryForCache);
+      updateAppSnapshotWithRecords();
       return;
     } catch (e) {
       console.warn('Monthly query failed, falling back to per-day getDoc:', e);
@@ -525,6 +536,7 @@ const fetchPetDailyRecords = async () => {
         dailyRecords[date] = summary;
       });
       void cacheSet(cacheKey, summaryForCache);
+      updateAppSnapshotWithRecords();
     } else if (!hadCached) {
       if (seq !== fetchRecordsSeq.value || monthKey.value !== expectedMonthKey) return;
       Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
@@ -578,18 +590,32 @@ const healthStatusClass = computed(() => {
 const fetchPetDetails = async () => {
   loading.value = true;
   try {
+    const petId = route.params.id;
+
+    if (userStore.loading) {
+      const snapshot = await loadAppSnapshot();
+      if (snapshot?.userId) {
+        userStore.hydrateFromSnapshot(snapshot);
+        petStore.hydrateFromSnapshot(snapshot);
+        userStore.loading = false;
+      }
+    }
+
     if (!userStore.isLoggedIn) {
       await userStore.initAuth();
     }
-    
-    const petId = route.params.id;
-    
-    // get pet details
+
     const foundPet = await petStore.getPetById(petId);
-    
+
     if (foundPet) {
       pet.value = foundPet;
-      // 先讓畫面出來（快取會在 fetchPetDailyRecords 內立刻填上），網路更新在背景跑
+      const lv = petStore.lastViewedPetForSnapshot;
+      if (lv?.petId === petId && lv?.monthKey === monthKey.value && lv?.dailyRecords) {
+        Object.keys(dailyRecords).forEach(key => delete dailyRecords[key]);
+        Object.entries(lv.dailyRecords).forEach(([date, summary]) => {
+          dailyRecords[date] = summary;
+        });
+      }
       loading.value = false;
       void fetchPetDailyRecords();
     } else {
@@ -611,6 +637,10 @@ onMounted(async () => {
   if (currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear()) {
     selectDate(today.getDate());
   }
+});
+
+onUnmounted(() => {
+  petStore.lastViewedPetForSnapshot = null;
 });
 
 // 月份切換時重新抓取月曆摘要（會先用快取顯示）

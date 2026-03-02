@@ -300,6 +300,7 @@ import AddPetForm from '../components/AddPetForm.vue'
 import EditPetForm from '../components/EditPetForm.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { useRouter } from 'vue-router'
+import { loadAppSnapshot, clearSnapshot } from 'src/services/appSnapshotService'
 
 // Get user store
 const userStore = useUserStore()
@@ -330,21 +331,36 @@ const familySettings = reactive({
 
 // Init auth on component mount
 onMounted(async () => {
-  // Check authentication state on load
-  await userStore.initAuth()
-  
-  if (userStore.hasFamily) {
-    await petStore.fetchFamilyPets()
+  const snapshot = await loadAppSnapshot()
+  const hasValidSnapshot = snapshot?.userId && snapshot?.user
+
+  if (hasValidSnapshot) {
+    userStore.hydrateFromSnapshot(snapshot)
+    petStore.hydrateFromSnapshot(snapshot)
+    userStore.loading = false
+    void (async () => {
+      const authUser = await userStore.initAuth({ background: true })
+      if (snapshot.userId !== authUser?.uid) {
+        void clearSnapshot()
+      }
+      if (userStore.hasFamily) {
+        await petStore.fetchFamilyPets()
+      }
+    })()
+  } else {
+    await userStore.initAuth()
+    if (userStore.hasFamily) {
+      await petStore.fetchFamilyPets()
+    }
   }
+
   const urlParams = new URLSearchParams(window.location.search)
   const joinId = urlParams.get('join')
-  
+
   if (joinId) {
-    // Wait for authentication state
     const unsubscribe = auth.onAuthStateChanged(user => {
       if (user) {
         setTimeout(() => {
-          // Wait for store initialization
           if (!userStore.hasFamily) {
             familyIdToJoin.value = joinId
             showJoinFamilyDialog.value = true
@@ -355,8 +371,7 @@ onMounted(async () => {
         unsubscribe()
       }
     })
-    
-    // 清除URL參數，避免重新整理頁面時重複處理
+
     window.history.replaceState({}, document.title, window.location.pathname)
   }
 })

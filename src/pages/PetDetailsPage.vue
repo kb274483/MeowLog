@@ -845,14 +845,55 @@ const exportToPdf = () => {
         <style>
           @media print {
             body { margin: 0; }
+            .export-toolbar { display: none !important; }
             .export-month { page-break-inside: avoid; }
           }
           body { background: #fff; }
+          .export-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #4b5563;
+            position: sticky;
+            top: 0;
+            background: #fff;
+            z-index: 10;
+          }
+          .export-toolbar button {
+            background: #f59e0b;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12px;
+          }
           .export-print-area { max-width: 100%; padding: 12px; }
         </style>
       </head>
       <body>
+        <div class="export-toolbar">
+          <span>列印完成後可點擊「關閉」返回</span>
+          <button type="button" onclick="window.close()">關閉</button>
+        </div>
         ${bodyHtml}
+        ${'<scr' + 'ipt>'}
+          (function () {
+            var closed = false;
+            function tryClose() {
+              if (closed) return;
+              closed = true;
+              try { window.close(); } catch (e) {}
+            }
+            window.addEventListener('afterprint', function () {
+              setTimeout(tryClose, 200);
+            });
+            // 如果 afterprint 沒觸發，給 20 秒保底自動關閉
+            setTimeout(tryClose, 20000);
+          })();
+        ${'</scr' + 'ipt>'}
       </body>
     </html>`);
   printWindow.document.close();

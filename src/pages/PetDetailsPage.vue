@@ -2,7 +2,7 @@
   <div class="bg-gray-50 min-h-screen relative">
     <!-- Header -->
     <div 
-      class="bg-white shadow-sm py-2 flex items-center fixed left-0 right-0 z-20" style="top: 50px;">
+      class="bg-white shadow-sm py-2 flex items-center fixed left-0 right-0 z-20 print-hidden" style="top: 50px;">
       <button 
         @click="goBack" 
         class="mr-4 p-4 hover:bg-gray-100 rounded-full text-gray-700 transition-colors"
@@ -44,7 +44,7 @@
     </div>
     
     <!-- loading -->
-    <div v-if="loading" class="flex justify-center items-center h-[90vh]">
+    <div v-if="loading" class="flex justify-center items-center h-[90vh] print-hidden">
       <div class="text-center">
         <q-spinner-dots size="60px" color="amber" />
         <p class="mt-4 text-gray-600">
@@ -53,7 +53,7 @@
       </div>
     </div>
     
-    <div v-else-if="!pet" class="flex justify-center items-center h-[90vh]">
+    <div v-else-if="!pet" class="flex justify-center items-center h-[90vh] print-hidden">
       <div class="text-center">
         <p class="text-xl text-gray-600">
           找不到此寵物
@@ -67,7 +67,7 @@
       </div>
     </div>
     
-    <div v-else class="container mx-auto p-4" style="padding-top: 94px;">
+    <div v-else class="container mx-auto p-4 print-hidden" style="padding-top: 94px;">
       <div 
         class="bg-white rounded-lg shadow-md p-2 mb-4 cursor-pointer hover:bg-amber-50 transition-colors"
         @click="showDataChart = true"
@@ -85,6 +85,15 @@
         <p class="text-sm text-gray-600 mt-2">
           查看『{{ pet.name }}』的體重、飲食與體溫變化趨勢
         </p>
+      </div>
+
+      <div class="flex justify-end mb-4">
+        <button
+          class="px-3 py-2 rounded-md text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+          @click="openExportDialog"
+        >
+          資料匯出
+        </button>
       </div>
       <!-- Calendar -->
       <div class="bg-white rounded-lg shadow-md p-1 mb-4">
@@ -189,6 +198,174 @@
         :selected-date="selectedDateObj"
         @saved="handleRecordSaved"
       />
+
+      <!-- Export Dialog -->
+      <q-dialog
+        v-model="showExportDialog"
+        class="pet-export-dialog"
+        maximized
+        persistent
+        transition-show="slide-up"
+        transition-hide="slide-down"
+      >
+        <q-card class="bg-white">
+          <q-card-section class="row items-center bg-amber-600 text-white q-py-sm">
+            <div class="text-h6">資料匯出</div>
+            <q-space />
+            <q-btn v-close-popup icon="close" flat round dense />
+          </q-card-section>
+
+          <q-card-section class="q-px-md q-py-sm export-dialog-body">
+            <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 mb-3">
+              <div class="flex flex-wrap gap-2 items-center mb-2">
+                <button
+                  class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+                  @click="setExportQuickRange('thisMonth')"
+                >
+                  本月
+                </button>
+                <button
+                  class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+                  @click="setExportQuickRange('lastMonth')"
+                >
+                  上個月
+                </button>
+                <button
+                  class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+                  @click="setExportQuickRange('lastThreeMonths')"
+                >
+                  近三個月
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-gray-600 mb-1">開始日期</label>
+                  <input
+                    v-model="exportRange.start"
+                    type="date"
+                    class="w-full rounded-md border-gray-300 shadow-sm p-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-600 mb-1">結束日期</label>
+                  <input
+                    v-model="exportRange.end"
+                    type="date"
+                    class="w-full rounded-md border-gray-300 shadow-sm p-2 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 mb-3">
+              <div class="text-sm font-medium text-gray-700 mb-2">匯出項目（可複選）</div>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <label
+                  v-for="option in exportFieldOptions"
+                  :key="option.key"
+                  class="flex items-center text-sm text-gray-700"
+                >
+                  <input
+                    v-model="exportSelectedFields"
+                    type="checkbox"
+                    :value="option.key"
+                    class="mr-2"
+                  />
+                  {{ option.label }}
+                </label>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 mb-3">
+              <button
+                class="px-3 py-2 rounded-md text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+                @click="fetchExportRecords"
+                :disabled="exportLoading"
+              >
+                {{ exportLoading ? '查詢中...' : '查詢' }}
+              </button>
+              <button
+                class="px-3 py-2 rounded-md text-sm font-medium bg-gray-700 text-white hover:bg-gray-800 transition-colors"
+                @click="exportToPdf"
+                :disabled="!exportReadyToPrint"
+              >
+                匯出 PDF
+              </button>
+              <span v-if="exportReadyToPrint" class="text-xs text-gray-500">
+                使用瀏覽器列印儲存為 PDF
+              </span>
+            </div>
+
+            <div v-if="exportHasSearched" ref="exportPrintAreaRef" class="export-print-area">
+              <div v-if="!exportHasResults" class="text-center text-gray-500 text-sm py-6">
+                該日期區間沒有可顯示的資料
+              </div>
+
+              <div v-else class="space-y-6">
+                <div
+                  v-for="month in exportMonths"
+                  :key="month.key"
+                  class="export-month bg-white rounded-lg border border-gray-200 p-2"
+                >
+                  <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-base font-semibold text-gray-800">
+                      {{ month.year }}年 {{ month.month + 1 }}月
+                    </h3>
+                    <span class="text-xs text-gray-500">
+                      {{ exportRange.start }} ~ {{ exportRange.end }}
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-7 mb-2">
+                    <div v-for="day in weekdays" :key="day" class="text-center text-xs font-medium text-gray-500 py-1">
+                      {{ day }}
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-7 gap-1">
+                    <div
+                      v-for="_ in month.firstDayOfMonth"
+                      :key="`empty-${month.key}-${_}`"
+                      class="h-24 sm:h-28 border border-gray-100 bg-gray-50 rounded"
+                    ></div>
+
+                    <div
+                      v-for="day in month.daysInMonth"
+                      :key="`day-${month.key}-${day}`"
+                      class="min-h-24 sm:min-h-28 border rounded p-1"
+                      :class="{
+                        'bg-gray-50 text-gray-300': !isExportDateInRange(month.year, month.month, day),
+                        'border-gray-200': isExportDateInRange(month.year, month.month, day)
+                      }"
+                    >
+                      <div class="flex justify-between">
+                        <span class="text-xs font-medium">
+                          {{ day }}
+                        </span>
+                      </div>
+
+                      <div
+                        v-if="isExportDateInRange(month.year, month.month, day)"
+                        class="text-[10px] text-gray-700 mt-1 flex flex-col gap-0.5 break-words whitespace-normal"
+                      >
+                        <template v-for="fieldKey in exportSelectedFields" :key="`${month.key}-${day}-${fieldKey}`">
+                          <span
+                            v-if="getExportFieldDisplay(getExportDateKey(month.year, month.month, day), fieldKey) !== null"
+                            :class="getExportFieldClass(fieldKey)"
+                          >
+                            {{ getExportFieldDisplay(getExportDateKey(month.year, month.month, day), fieldKey) }}
+                          </span>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </q-dialog>
       
       <!-- Chart Dialog -->
       <pet-data-chart-dialog
@@ -244,6 +421,24 @@ const selectedDateObj = ref(null);
 const dailyRecords = reactive({});
 const showDataChart = ref(false);
 const fetchRecordsSeq = ref(0);
+const showExportDialog = ref(false);
+const exportRange = reactive({ start: '', end: '' });
+const exportSelectedFields = ref([]);
+const exportLoading = ref(false);
+const exportHasSearched = ref(false);
+const exportRecords = reactive({});
+const exportPrintAreaRef = ref(null);
+
+const exportFieldOptions = [
+  { key: 'foodAmount', label: '乾糧攝取量', unit: 'g', type: 'number' },
+  { key: 'wetFoodAmount', label: '濕食攝取量', unit: '/10', type: 'number' },
+  { key: 'dailyWeight', label: '體重', unit: 'kg', type: 'number' },
+  { key: 'temperature', label: '體溫', unit: '°C', type: 'number' },
+  { key: 'hasVomit', label: '是否嘔吐', type: 'boolean' },
+  { key: 'hasDiarrhea', label: '是否腹瀉', type: 'boolean' },
+  { key: 'heartRate', label: '心跳', unit: '次/分', type: 'number' },
+  { key: 'respirationRate', label: '呼吸', unit: '次/分', type: 'number' }
+];
 
 const monthKey = computed(() => {
   return `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`;
@@ -257,6 +452,13 @@ const goBack = () => {
 const goToFiles = () => {
   if (!pet.value?.id) return;
   router.push({ name: 'pet-files', params: { id: pet.value.id } });
+};
+
+const openExportDialog = () => {
+  showExportDialog.value = true;
+  if (!exportRange.start || !exportRange.end) {
+    setExportQuickRange('thisMonth');
+  }
 };
 
 // 
@@ -337,6 +539,11 @@ const formatTemperature = (t) => {
   return Number(t).toFixed(1);
 };
 
+const formatNumber = (v, decimals = 0) => {
+  if (v === null || v === undefined) return '';
+  return Number(v).toFixed(decimals);
+};
+
 // check if has notes
 const hasNotes = (day) => {
   const dateKey = formatDateKey(currentYear.value, currentMonth.value, day);
@@ -411,6 +618,249 @@ const formatDate = (date) => {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const exportRangeValid = computed(() => {
+  if (!exportRange.start || !exportRange.end) return false;
+  return exportRange.start <= exportRange.end;
+});
+
+const exportHasResults = computed(() => Object.keys(exportRecords).length > 0);
+
+const exportReadyToPrint = computed(() => {
+  return exportHasSearched.value && exportSelectedFields.value.length > 0;
+});
+
+const setExportQuickRange = (type) => {
+  const today = new Date();
+  if (type === 'thisMonth') {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    exportRange.start = formatDate(start);
+    exportRange.end = formatDate(end);
+    return;
+  }
+  if (type === 'lastMonth') {
+    const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const end = new Date(today.getFullYear(), today.getMonth(), 0);
+    exportRange.start = formatDate(start);
+    exportRange.end = formatDate(end);
+    return;
+  }
+  if (type === 'lastThreeMonths') {
+    const start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    exportRange.start = formatDate(start);
+    exportRange.end = formatDate(end);
+  }
+};
+
+const clearExportRecords = () => {
+  Object.keys(exportRecords).forEach(key => delete exportRecords[key]);
+};
+
+const normalizeExportRecord = (recordData) => {
+  return {
+    date: recordData.date || null,
+    foodAmount: recordData.foodAmount ?? null,
+    wetFoodAmount: recordData.wetFoodAmount ?? null,
+    dailyWeight: recordData.dailyWeight ?? null,
+    temperature: recordData.temperature ?? null,
+    hasVomit: !!recordData.hasVomit,
+    hasDiarrhea: !!recordData.hasDiarrhea,
+    heartRate: recordData.heartRate ?? null,
+    respirationRate: recordData.respirationRate ?? null
+  };
+};
+
+const getDateRangeKeys = (startStr, endStr) => {
+  const dates = [];
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  const cursor = new Date(start);
+
+  while (cursor <= end) {
+    dates.push(formatDate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+};
+
+const fetchExportRecords = async () => {
+  if (!pet.value || !userStore.hasFamily) return;
+  if (!exportRangeValid.value) {
+    notification.error('請先選擇日期區間');
+    return;
+  }
+  if (exportSelectedFields.value.length === 0) {
+    notification.error('請至少選擇一個匯出項目');
+    return;
+  }
+
+  exportLoading.value = true;
+  exportHasSearched.value = true;
+  clearExportRecords();
+
+  try {
+    const startDate = exportRange.start;
+    const endDate = exportRange.end;
+
+    try {
+      const rangeQuery = query(
+        collection(db, 'petDailyRecords'),
+        where('petId', '==', pet.value.id),
+        where('familyId', '==', userStore.family.id),
+        where('date', '>=', startDate),
+        where('date', '<=', endDate),
+        orderBy('date', 'asc')
+      );
+
+      const querySnapshot = await getDocs(rangeQuery);
+      querySnapshot.forEach((d) => {
+        const recordData = d.data();
+        if (!recordData?.date) return;
+        exportRecords[recordData.date] = normalizeExportRecord(recordData);
+      });
+      return;
+    } catch (error) {
+      console.warn('Range query failed, falling back to per-day getDoc:', error);
+    }
+
+    const dateKeys = getDateRangeKeys(startDate, endDate);
+    const reads = dateKeys.map((dateKey) => {
+      const recordId = `${pet.value.id}_${dateKey}`;
+      const recordRef = doc(db, 'petDailyRecords', recordId);
+      return getDoc(recordRef).then((snap) => {
+        if (!snap.exists()) return;
+        const recordData = snap.data();
+        if (!recordData?.date) return;
+        exportRecords[recordData.date] = normalizeExportRecord(recordData);
+      });
+    });
+
+    await Promise.all(reads);
+  } catch (error) {
+    console.error('Error:', error);
+    notification.error('查詢失敗，請稍後再試');
+  } finally {
+    exportLoading.value = false;
+  }
+};
+
+const exportMonths = computed(() => {
+  if (!exportRangeValid.value) return [];
+  const start = new Date(exportRange.start);
+  const end = new Date(exportRange.end);
+  const months = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+
+  while (cursor <= endMonth) {
+    const year = cursor.getFullYear();
+    const month = cursor.getMonth();
+    months.push({
+      key: `${year}-${String(month + 1).padStart(2, '0')}`,
+      year,
+      month,
+      daysInMonth: new Date(year, month + 1, 0).getDate(),
+      firstDayOfMonth: new Date(year, month, 1).getDay()
+    });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
+});
+
+const isExportDateInRange = (year, month, day) => {
+  if (!exportRangeValid.value) return false;
+  const dateKey = formatDateKey(year, month, day);
+  return dateKey >= exportRange.start && dateKey <= exportRange.end;
+};
+
+const getExportDateKey = (year, month, day) => {
+  return formatDateKey(year, month, day);
+};
+
+const getExportFieldDisplay = (dateKey, fieldKey) => {
+  const record = exportRecords[dateKey];
+  if (!record) return null;
+
+  switch (fieldKey) {
+    case 'foodAmount':
+      return record.foodAmount === null ? null : `${formatNumber(record.foodAmount, 0)} g`;
+    case 'wetFoodAmount':
+      return record.wetFoodAmount === null ? null : `${formatNumber(record.wetFoodAmount, 0)}/10`;
+    case 'dailyWeight':
+      return record.dailyWeight === null ? null : `${formatWeight(record.dailyWeight)} kg`;
+    case 'temperature':
+      return record.temperature === null ? null : `${formatTemperature(record.temperature)} °C`;
+    case 'hasVomit':
+      return record.hasVomit ? '嘔吐' : null;
+    case 'hasDiarrhea':
+      return record.hasDiarrhea ? '腹瀉' : null;
+    case 'heartRate':
+      return record.heartRate === null ? null : `${formatNumber(record.heartRate, 0)} 次/分`;
+    case 'respirationRate':
+      return record.respirationRate === null ? null : `${formatNumber(record.respirationRate, 0)} 次/分`;
+    default:
+      return null;
+  }
+};
+
+const getExportFieldClass = (fieldKey) => {
+  const base = 'inline-block px-1 py-0.5 rounded text-[10px]';
+  if (fieldKey === 'hasVomit' || fieldKey === 'hasDiarrhea') {
+    return `${base} bg-red-100 text-red-700 font-semibold`;
+  }
+  return `${base} bg-amber-50 text-amber-800`;
+};
+
+const exportToPdf = () => {
+  if (!exportReadyToPrint.value) {
+    notification.error('請先完成查詢並選擇匯出項目');
+    return;
+  }
+  if (!exportPrintAreaRef.value) {
+    notification.error('找不到匯出內容');
+    return;
+  }
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    notification.error('無法開啟列印視窗，請允許彈出視窗');
+    return;
+  }
+
+  const headHtml = document.head.innerHTML || '';
+  const bodyHtml = exportPrintAreaRef.value.outerHTML;
+  const titleText = `資料匯出-${pet.value?.name || ''}`;
+
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${titleText}</title>
+        ${headHtml}
+        <style>
+          @media print {
+            body { margin: 0; }
+            .export-month { page-break-inside: avoid; }
+          }
+          body { background: #fff; }
+          .export-print-area { max-width: 100%; padding: 12px; }
+        </style>
+      </head>
+      <body>
+        ${bodyHtml}
+      </body>
+    </html>`);
+  printWindow.document.close();
+
+  setTimeout(() => {
+    printWindow.focus();
+    printWindow.print();
+  }, 300);
 };
 
 const updateAppSnapshotWithRecords = () => {
@@ -663,5 +1113,50 @@ watch(currentDate, async () => {
   position: relative;
   z-index: 10;
   transition: all 0.2s ease;
+}
+
+@media print {
+  .print-hidden {
+    display: none !important;
+  }
+
+  .export-dialog-body {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .pet-export-dialog :deep(.q-dialog__backdrop) {
+    display: none !important;
+  }
+
+  .pet-export-dialog :deep(.q-dialog__inner) {
+    align-items: flex-start !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  .pet-export-dialog :deep(.q-card) {
+    box-shadow: none !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .pet-export-dialog :deep(.q-card__section) {
+    overflow: visible !important;
+  }
+
+  .export-print-area {
+    overflow: visible !important;
+  }
+
+  .export-month {
+    page-break-inside: avoid;
+  }
+}
+
+.export-dialog-body {
+  max-height: calc(100vh - 50px);
+  overflow-y: auto;
 }
 </style>

@@ -236,6 +236,24 @@
                 >
                   近三個月
                 </button>
+                <button
+                  class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+                  @click="setExportQuickRange('lastSixMonths')"
+                >
+                  近六個月
+                </button>
+                <button
+                  class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+                  @click="setExportQuickRange('lastNineMonths')"
+                >
+                  近九個月
+                </button>
+                <button
+                  class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+                  @click="setExportQuickRange('lastYear')"
+                >
+                  近一年
+                </button>
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -649,6 +667,27 @@ const setExportQuickRange = (type) => {
   }
   if (type === 'lastThreeMonths') {
     const start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    exportRange.start = formatDate(start);
+    exportRange.end = formatDate(end);
+    return;
+  }
+  if (type === 'lastSixMonths') {
+    const start = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    exportRange.start = formatDate(start);
+    exportRange.end = formatDate(end);
+    return;
+  }
+  if (type === 'lastNineMonths') {
+    const start = new Date(today.getFullYear(), today.getMonth() - 8, 1);
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    exportRange.start = formatDate(start);
+    exportRange.end = formatDate(end);
+    return;
+  }
+  if (type === 'lastYear') {
+    const start = new Date(today.getFullYear(), today.getMonth() - 11, 1);
     const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     exportRange.start = formatDate(start);
     exportRange.end = formatDate(end);

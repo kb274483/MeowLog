@@ -48,20 +48,30 @@
           <!-- 濕食攝取量 -->
           <div class="mb-3">
             <label class="block text-xs font-medium text-gray-700 mb-1">
-              濕食攝取量 - {{ formData.wetFoodAmount }}/10
+              濕食攝取量 (罐)
             </label>
-            <div class="flex items-center">
-              <span class="text-xs text-gray-500 mr-2">0</span>
-              <input 
-                type="range" 
-                v-model.number="formData.wetFoodAmount" 
-                min="0" 
-                max="10" 
-                step="1"
-                class="w-full accent-amber-600"
-              />
-              <span class="text-xs text-gray-500 ml-2">10</span>
+            <div class="flex flex-wrap gap-1 mb-2">
+              <button
+                v-for="preset in wetFoodPresets"
+                :key="preset.value"
+                type="button"
+                @click="formData.wetFoodAmount = preset.value"
+                class="px-2 py-1 text-xs rounded border transition-colors"
+                :class="isWetFoodPresetActive(preset.value)
+                  ? 'bg-amber-600 text-white border-amber-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-amber-400'"
+              >
+                {{ preset.label }}
+              </button>
             </div>
+            <input
+              v-model.number="formData.wetFoodAmount"
+              type="number"
+              min="0"
+              step="0.05"
+              placeholder="自訂 (罐)"
+              class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2 text-sm"
+            />
           </div>
 
           <!-- 乾糧攝取量 -->
@@ -280,14 +290,31 @@ const formData = reactive({
   mediaFiles: []
 });
 
+// Wet food quick-select presets (unit: cans)
+const wetFoodPresets = [
+  { label: '0', value: 0 },
+  { label: '1/4', value: 0.25 },
+  { label: '1/3', value: 0.3333 },
+  { label: '1/2', value: 0.5 },
+  { label: '2/3', value: 0.6667 },
+  { label: '3/4', value: 0.75 },
+  { label: '1', value: 1 },
+  { label: '1½', value: 1.5 },
+  { label: '2', value: 2 },
+];
+
+const isWetFoodPresetActive = (presetValue) => {
+  return Math.abs((formData.wetFoodAmount || 0) - presetValue) < 0.001;
+};
+
 // Calculate calories based on CURRENT family settings (for live edits)
 const caloriesFromInputs = computed(() => {
   if (!userStore.family) return 0;
   
   const wetCalsPerUnit = userStore.family.wetFoodCalories || 0;
   const dryCalsPerGram = userStore.family.dryFoodCalories || 0;
-  
-  const wetCals = (formData.wetFoodAmount / 10) * wetCalsPerUnit;
+
+  const wetCals = (formData.wetFoodAmount || 0) * wetCalsPerUnit;
   const dryCals = (formData.foodAmount || 0) * dryCalsPerGram;
   
   return Math.round(wetCals + dryCals);
@@ -418,6 +445,12 @@ const loadDailyRecord = async (date) => {
         recordData.tags = [recordData.tag];
       } else if (!recordData.tags) {
         recordData.tags = [];
+      }
+
+      // Migration: Handle old wetFoodAmount format (integer 0–10 = tenths of a can)
+      // New format stores decimal cans directly (e.g. 0.5 = half a can), marked by wetFoodAmountV2: true
+      if (!recordData.wetFoodAmountV2) {
+        recordData.wetFoodAmount = (recordData.wetFoodAmount || 0) / 10;
       }
       
       // Process media files data, ensure each file has correct type flags
@@ -571,6 +604,7 @@ const saveRecord = async () => {
       tag: formData.tags.length > 0 ? formData.tags[0] : null, 
       foodAmount: formData.foodAmount || null,
       wetFoodAmount: formData.wetFoodAmount || 0,
+      wetFoodAmountV2: true,
       calories: calculatedCalories.value,
       hasVomit: formData.hasVomit || false,
       vomitCount: formData.hasVomit ? (formData.vomitCount || 1) : null,

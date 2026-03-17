@@ -363,9 +363,8 @@ const renderChartOnElement = (element) => {
           type: 'linear',
           display: true,
           position: 'right',
-          title: { display: true, text: '濕食' },
+          title: { display: true, text: '濕食 (罐)' },
           min: 0,
-          max: 10,
           grid: {
             drawOnChartArea: false
           }
@@ -476,8 +475,8 @@ const renderChartOnElement = (element) => {
                 
                 if (context.dataset.yAxisID === 'y1') {
                    // Wet food
-                   value = Math.round(value);
-                   unit = '';
+                   value = value.toFixed(2);
+                   unit = '罐';
                 } else if (selectedMetric.value.value === 'diet') {
                    // Dry food
                    value = Math.round(value);

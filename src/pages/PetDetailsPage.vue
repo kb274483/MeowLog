@@ -449,7 +449,7 @@ const exportPrintAreaRef = ref(null);
 
 const exportFieldOptions = [
   { key: 'foodAmount', label: '乾糧攝取量', unit: 'g', type: 'number' },
-  { key: 'wetFoodAmount', label: '濕食攝取量', unit: '/10', type: 'number' },
+  { key: 'wetFoodAmount', label: '濕食攝取量', unit: '罐', type: 'number' },
   { key: 'dailyWeight', label: '體重', unit: 'kg', type: 'number' },
   { key: 'temperature', label: '體溫', unit: '°C', type: 'number' },
   { key: 'hasVomit', label: '是否嘔吐', type: 'boolean' },
@@ -702,7 +702,12 @@ const normalizeExportRecord = (recordData) => {
   return {
     date: recordData.date || null,
     foodAmount: recordData.foodAmount ?? null,
-    wetFoodAmount: recordData.wetFoodAmount ?? null,
+    wetFoodAmount: (() => {
+      const v = recordData.wetFoodAmount ?? null;
+      if (v === null) return null;
+      // Migration: old format stored integers 0–10 (tenths of a can)
+      return recordData.wetFoodAmountV2 ? v : v / 10;
+    })(),
     dailyWeight: recordData.dailyWeight ?? null,
     temperature: recordData.temperature ?? null,
     hasVomit: !!recordData.hasVomit,
@@ -827,7 +832,7 @@ const getExportFieldDisplay = (dateKey, fieldKey) => {
     case 'foodAmount':
       return record.foodAmount === null ? null : `${formatNumber(record.foodAmount, 0)} g`;
     case 'wetFoodAmount':
-      return record.wetFoodAmount === null ? null : `${formatNumber(record.wetFoodAmount, 0)}/10`;
+      return !record.wetFoodAmount ? null : `${formatNumber(record.wetFoodAmount, 2)} 罐`;
     case 'dailyWeight':
       return record.dailyWeight === null ? null : `${formatWeight(record.dailyWeight)} kg`;
     case 'temperature':

@@ -1,5 +1,5 @@
-import { db } from 'src/boot/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { db } from 'src/boot/firebase'
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
 
 /**
  * 獲取寵物的時間序列數據
@@ -18,11 +18,11 @@ export const getPetTimeSeriesData = async (petId, familyId, startDate, endDate, 
       where('familyId', '==', familyId),
       where('date', '>=', startDate.toISOString().split('T')[0]),
       where('date', '<=', endDate.toISOString().split('T')[0]),
-      orderBy('date', 'asc')
-    );
-    
-    const querySnapshot = await getDocs(petRecordsQuery);
-    
+      orderBy('date', 'asc'),
+    )
+
+    const querySnapshot = await getDocs(petRecordsQuery)
+
     const result = {
       dates: [],
       metrics: {
@@ -32,27 +32,32 @@ export const getPetTimeSeriesData = async (petId, familyId, startDate, endDate, 
         heartRate: [],
         temperature: [],
         wetFoodAmount: [],
-        calories: []
-      }
-    };
-    
+        calories: [],
+      },
+    }
+
     querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      result.dates.push(data.date);
-      
-      metrics.forEach(metric => {
+      const data = doc.data()
+      result.dates.push(data.date)
+
+      metrics.forEach((metric) => {
         if (result.metrics[metric]) {
-          result.metrics[metric].push(data[metric] || null);
+          let value = data[metric] ?? null
+          // Migration: old wetFoodAmount was stored as integer 0–10 (tenths of a can)
+          if (metric === 'wetFoodAmount' && value !== null && !data.wetFoodAmountV2) {
+            value = value / 10
+          }
+          result.metrics[metric].push(value)
         }
-      });
-    });
-    
-    return result;
+      })
+    })
+
+    return result
   } catch (error) {
-    console.error('獲取寵物時間序列數據失敗:', error);
-    throw error;
+    console.error('獲取寵物時間序列數據失敗:', error)
+    throw error
   }
-};
+}
 
 /**
  * 格式化日期為 YYYY-MM-DD
@@ -79,51 +84,51 @@ export const getMetricStats = (timeSeriesData, metric) => {
       avg: null,
       min: null,
       max: null,
-      trend: 'stable'
-    };
+      trend: 'stable',
+    }
   }
-  
-  const values = timeSeriesData.metrics[metric].filter(val => val !== null && val !== undefined);
-  
+
+  const values = timeSeriesData.metrics[metric].filter((val) => val !== null && val !== undefined)
+
   if (values.length === 0) {
     return {
       avg: null,
       min: null,
       max: null,
-      trend: 'stable'
-    };
-  }
-  
-  const sum = values.reduce((a, b) => a + b, 0);
-  const avg = sum / values.length;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  
-  let trend = 'stable';
-  if (values.length > 1) {
-    const midPoint = Math.floor(values.length / 2);
-    const firstHalf = values.slice(0, midPoint);
-    const secondHalf = values.slice(midPoint);
-    
-    const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
-    const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
-    
-    const diffPercent = ((secondAvg - firstAvg) / firstAvg) * 100;
-    
-    if (diffPercent > 5) {
-      trend = 'increasing';
-    } else if (diffPercent < -5) {
-      trend = 'decreasing';
+      trend: 'stable',
     }
   }
-  
+
+  const sum = values.reduce((a, b) => a + b, 0)
+  const avg = sum / values.length
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+
+  let trend = 'stable'
+  if (values.length > 1) {
+    const midPoint = Math.floor(values.length / 2)
+    const firstHalf = values.slice(0, midPoint)
+    const secondHalf = values.slice(midPoint)
+
+    const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length
+    const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length
+
+    const diffPercent = ((secondAvg - firstAvg) / firstAvg) * 100
+
+    if (diffPercent > 5) {
+      trend = 'increasing'
+    } else if (diffPercent < -5) {
+      trend = 'decreasing'
+    }
+  }
+
   return {
     avg,
     min,
     max,
-    trend
-  };
-};
+    trend,
+  }
+}
 
 /**
  * 獲取日期的週數
@@ -146,43 +151,50 @@ export const getMetricStats = (timeSeriesData, metric) => {
  * @returns {Object} - 按時間間隔的平均值
  */
 export const getAveragesByInterval = (timeSeriesData, metric, interval = 'day') => {
-  if (!timeSeriesData || !timeSeriesData.dates || !timeSeriesData.metrics || !timeSeriesData.metrics[metric]) {
-    return { labels: [], values: [] };
+  if (
+    !timeSeriesData ||
+    !timeSeriesData.dates ||
+    !timeSeriesData.metrics ||
+    !timeSeriesData.metrics[metric]
+  ) {
+    return { labels: [], values: [] }
   }
-  
-  const dates = timeSeriesData.dates;
-  const values = timeSeriesData.metrics[metric];
-  
-  const groupedData = {};
-  
+
+  const dates = timeSeriesData.dates
+  const values = timeSeriesData.metrics[metric]
+
+  const groupedData = {}
+
   dates.forEach((date, index) => {
-    if (values[index] === null || values[index] === undefined) return;
-    
-    let groupKey = date;
-    
+    if (values[index] === null || values[index] === undefined) return
+
+    let groupKey = date
+
     if (interval === 'week') {
-      const d = new Date(date);
-      const weekNumber = Math.ceil((d.getDate() + new Date(d.getFullYear(), d.getMonth(), 1).getDay()) / 7);
-      groupKey = `${date.substring(0, 7)}-W${weekNumber}`;
+      const d = new Date(date)
+      const weekNumber = Math.ceil(
+        (d.getDate() + new Date(d.getFullYear(), d.getMonth(), 1).getDay()) / 7,
+      )
+      groupKey = `${date.substring(0, 7)}-W${weekNumber}`
     } else if (interval === 'month') {
-      groupKey = date.substring(0, 7);
+      groupKey = date.substring(0, 7)
     }
-    
+
     if (!groupedData[groupKey]) {
-      groupedData[groupKey] = [];
+      groupedData[groupKey] = []
     }
-    
-    groupedData[groupKey].push(values[index]);
-  });
-  
-  const labels = Object.keys(groupedData).sort();
-  const averages = labels.map(key => {
-    const groupValues = groupedData[key];
-    return groupValues.reduce((a, b) => a + b, 0) / groupValues.length;
-  });
-  
+
+    groupedData[groupKey].push(values[index])
+  })
+
+  const labels = Object.keys(groupedData).sort()
+  const averages = labels.map((key) => {
+    const groupValues = groupedData[key]
+    return groupValues.reduce((a, b) => a + b, 0) / groupValues.length
+  })
+
   return {
     labels,
-    values: averages
-  };
-}; 
+    values: averages,
+  }
+}

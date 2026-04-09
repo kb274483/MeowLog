@@ -93,8 +93,7 @@ export const useUserStore = defineStore('user', () => {
       return family.value
     } catch (error) {
       console.error('Load family data failed', error)
-      family.value = null
-      return null
+      return family.value
     }
   }
 

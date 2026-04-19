@@ -424,7 +424,10 @@ const todayYmd = () => new Date().toISOString().split('T')[0];
 
 // Actions
 const fetchRecords = async () => {
-  if (!userStore.family?.id || !petId.value) return;
+  if (!userStore.family?.id || !petId.value) {
+    loading.value = false;
+    return;
+  }
   loading.value = true;
   try {
     const q = query(

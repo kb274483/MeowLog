@@ -57,8 +57,13 @@ const loadPdf = async () => {
   error.value = false;
 
   try {
-    // 載入 PDF 文件
-    const loadingTask = pdfjsLib.getDocument(props.url);
+    // 先以 fetch 取得 ArrayBuffer，避免 PDF.js Worker 在某些行動裝置上
+    // 因跨來源存取控制而無法直接 fetch Firebase Storage URL
+    const response = await fetch(props.url);
+    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+    const arrayBuffer = await response.arrayBuffer();
+
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
     pdfDoc = await loadingTask.promise;
 
     // 取得第一頁

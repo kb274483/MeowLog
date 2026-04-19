@@ -859,7 +859,12 @@ const shareFile = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  // Handle direct page load / iOS PWA restore: IndexPage may not have been mounted,
+  // so auth (and family data) may not be initialized yet.
+  if (userStore.loading) {
+    await userStore.initAuth();
+  }
   fetchRecords();
 });
 </script>

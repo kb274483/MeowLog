@@ -78,6 +78,7 @@
             group="records"
             header-class="bg-white hover:bg-gray-50 transition-colors border-b border-gray-100"
             expand-icon-class="text-gray-400"
+            @before-show="onBeforeShow(record.id)"
           >
             <!-- Header -->
             <template v-slot:header>
@@ -123,8 +124,8 @@
               </q-item-section>
             </template>
 
-            <!-- Content (File Grid) -->
-            <div class="p-4 border-b border-gray-100 bg-amber-50">
+            <!-- Content (File Grid) - 延遲掛載：第一次展開後才 mount，之後保留以加快重複展開 -->
+            <div v-if="openedRecords[record.id]" class="p-4 border-b border-gray-100 bg-amber-50">
               <div v-if="record.files.length === 0" class="text-center text-gray-400 py-4 text-sm">
                 此紀錄沒有檔案
               </div>
@@ -343,7 +344,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useUserStore } from 'src/stores/userStore';
 import { notification } from 'src/boot/notification';
@@ -366,6 +367,13 @@ const loading = ref(true);
 const processing = ref(false);
 const records = ref([]);
 const uploadProgress = ref(0);
+
+// 已展開過的紀錄 id，用來延遲掛載 expansion 內容區（避免 14 筆紀錄一進頁面就把所有檔案卡片、PDF 縮圖、按鈕全部 mount，對 iOS 記憶體壓力太大）
+const openedRecords = reactive({});
+
+const onBeforeShow = (recordId) => {
+  openedRecords[recordId] = true;
+};
 
 // Filters
 const filterYear = ref(null);

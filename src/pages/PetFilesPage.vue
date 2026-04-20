@@ -424,10 +424,7 @@ const todayYmd = () => new Date().toISOString().split('T')[0];
 
 // Actions
 const fetchRecords = async () => {
-  if (!userStore.family?.id || !petId.value) {
-    loading.value = false;
-    return;
-  }
+  if (!userStore.family?.id || !petId.value) return;
   loading.value = true;
   try {
     const q = query(
@@ -859,12 +856,7 @@ const shareFile = async () => {
   }
 };
 
-onMounted(async () => {
-  // Handle direct page load / iOS PWA restore: IndexPage may not have been mounted,
-  // so auth (and family data) may not be initialized yet.
-  if (userStore.loading) {
-    await userStore.initAuth();
-  }
+onMounted(() => {
   fetchRecords();
 });
 </script>

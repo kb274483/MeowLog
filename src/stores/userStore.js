@@ -22,7 +22,6 @@ export const useUserStore = defineStore('user', () => {
   const user = ref(null)
   const family = ref(null)
   const loading = ref(true)
-  let _authListenerRegistered = false
 
   // Getters
   const isLoggedIn = computed(() => user.value !== null)
@@ -43,12 +42,6 @@ export const useUserStore = defineStore('user', () => {
   const initAuth = (options = {}) => {
     const isBackground = !!options.background
     if (!isBackground) loading.value = true
-
-    // Prevent duplicate listeners if called from multiple pages
-    if (_authListenerRegistered) {
-      return Promise.resolve(user.value)
-    }
-    _authListenerRegistered = true
 
     return new Promise((resolve) => {
       onAuthStateChanged(auth, async (userData) => {

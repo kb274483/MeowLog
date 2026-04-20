@@ -39,11 +39,13 @@ export const useUserStore = defineStore('user', () => {
 
   // Initialize auth state listener
   // options.background: when true, do not touch loading (for stale-while-revalidate)
+  let _authReady = null
   const initAuth = (options = {}) => {
     const isBackground = !!options.background
+    if (!isBackground && _authReady) return _authReady
     if (!isBackground) loading.value = true
 
-    return new Promise((resolve) => {
+    const promise = new Promise((resolve) => {
       onAuthStateChanged(auth, async (userData) => {
         if (userData) {
           user.value = userData
@@ -58,6 +60,9 @@ export const useUserStore = defineStore('user', () => {
         if (!isBackground) loading.value = false
       })
     })
+
+    if (!isBackground) _authReady = promise
+    return promise
   }
 
   // Load user's family data

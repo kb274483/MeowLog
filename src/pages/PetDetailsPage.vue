@@ -277,7 +277,25 @@
             </div>
 
             <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 mb-3">
-              <div class="text-sm font-medium text-gray-700 mb-2">匯出項目（可複選）</div>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <div class="text-sm font-medium text-gray-700">匯出項目（可複選）</div>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
+                    @click="selectAllExportFields"
+                  >
+                    全選
+                  </button>
+                  <button
+                    type="button"
+                    class="px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                    @click="clearExportSelectedFields"
+                  >
+                    全取消
+                  </button>
+                </div>
+              </div>
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <label
                   v-for="option in exportFieldOptions"
@@ -457,6 +475,14 @@ const exportFieldOptions = [
   { key: 'heartRate', label: '心跳', unit: '次/分', type: 'number' },
   { key: 'respirationRate', label: '呼吸', unit: '次/分', type: 'number' }
 ];
+
+const selectAllExportFields = () => {
+  exportSelectedFields.value = exportFieldOptions.map(option => option.key);
+};
+
+const clearExportSelectedFields = () => {
+  exportSelectedFields.value = [];
+};
 
 const monthKey = computed(() => {
   return `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`;
@@ -711,10 +737,16 @@ const normalizeExportRecord = (recordData) => {
     dailyWeight: recordData.dailyWeight ?? null,
     temperature: recordData.temperature ?? null,
     hasVomit: !!recordData.hasVomit,
+    vomitCount: recordData.hasVomit ? Number(recordData.vomitCount ?? 1) : null,
     hasDiarrhea: !!recordData.hasDiarrhea,
+    diarrheaCount: recordData.hasDiarrhea ? Number(recordData.diarrheaCount ?? 1) : null,
     heartRate: recordData.heartRate ?? null,
     respirationRate: recordData.respirationRate ?? null
   };
+};
+
+const formatSymptomExportLabel = (label, count) => {
+  return `${label} ${Number(count ?? 1)}次`;
 };
 
 const getDateRangeKeys = (startStr, endStr) => {
@@ -838,9 +870,9 @@ const getExportFieldDisplay = (dateKey, fieldKey) => {
     case 'temperature':
       return record.temperature === null ? null : `${formatTemperature(record.temperature)} °C`;
     case 'hasVomit':
-      return record.hasVomit ? '嘔吐' : null;
+      return record.hasVomit ? formatSymptomExportLabel('嘔吐', record.vomitCount) : null;
     case 'hasDiarrhea':
-      return record.hasDiarrhea ? '腹瀉' : null;
+      return record.hasDiarrhea ? formatSymptomExportLabel('腹瀉', record.diarrheaCount) : null;
     case 'heartRate':
       return record.heartRate === null ? null : `${formatNumber(record.heartRate, 0)} 次/分`;
     case 'respirationRate':
@@ -852,8 +884,14 @@ const getExportFieldDisplay = (dateKey, fieldKey) => {
 
 const getExportFieldClass = (fieldKey) => {
   const base = 'inline-block px-1 py-0.5 rounded text-[10px]';
-  if (fieldKey === 'hasVomit' || fieldKey === 'hasDiarrhea') {
+  if (fieldKey === 'hasVomit') {
     return `${base} bg-red-100 text-red-700 font-semibold`;
+  }
+  if (fieldKey === 'hasDiarrhea') {
+    return `${base} bg-teal-100 text-teal-700 font-semibold`;
+  }
+  if (['dailyWeight', 'temperature', 'heartRate', 'respirationRate'].includes(fieldKey)) {
+    return `${base} bg-slate-200 text-amber-800`;
   }
   return `${base} bg-amber-50 text-amber-800`;
 };

@@ -27,14 +27,23 @@
               @click="setExportQuickRange(r.key)"
             >{{ r.label }}</button>
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="min-w-0">
-              <div class="ml-field-label">開始日期</div>
-              <input v-model="exportRange.start" type="date" class="export-date-input" />
-            </div>
-            <div class="min-w-0">
-              <div class="ml-field-label">結束日期</div>
-              <input v-model="exportRange.end" type="date" class="export-date-input" />
+          <div>
+            <div class="ml-field-label">日期區間</div>
+            <div class="export-date-range-display">
+              <q-icon name="event" size="16px" style="color: var(--ml-text-muted);" />
+              <span>{{ exportRange.start || '開始日期' }} ~ {{ exportRange.end || '結束日期' }}</span>
+              <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                <q-date
+                  v-model="datePickerModel"
+                  range
+                  mask="YYYY-MM-DD"
+                  @update:model-value="onDateRangeSelect"
+                >
+                  <div class="row items-center justify-end q-px-sm q-pb-xs">
+                    <q-btn flat dense size="sm" label="重新選擇" color="grey-7" @click.stop="resetDateSelection" />
+                  </div>
+                </q-date>
+              </q-popup-proxy>
             </div>
           </div>
         </div>
@@ -207,6 +216,37 @@ const exportRecords = reactive({});
 const exportPrintAreaRef = ref(null);
 const activeQuickRange = ref('');
 
+const datePickerModel = ref(null);
+
+const onDateRangeSelect = (val) => {
+  if (!val) {
+    exportRange.start = '';
+    exportRange.end = '';
+    return;
+  }
+  if (typeof val === 'string') {
+    exportRange.start = val;
+    exportRange.end = '';
+    return;
+  }
+  if (val.from && val.to) {
+    const sorted = [val.from, val.to].sort();
+    exportRange.start = sorted[0];
+    exportRange.end   = sorted[1];
+    activeQuickRange.value = '';
+  } else if (val.from) {
+    exportRange.start = val.from;
+    exportRange.end = '';
+  }
+};
+
+const resetDateSelection = () => {
+  datePickerModel.value = null;
+  exportRange.start = '';
+  exportRange.end = '';
+  activeQuickRange.value = '';
+};
+
 const exportSelectedFieldsWithoutNotes = computed(() =>
   exportSelectedFields.value.filter(k => k !== 'notes')
 );
@@ -268,6 +308,7 @@ const setExportQuickRange = (type) => {
   if (start && end) {
     exportRange.start = formatDate(start);
     exportRange.end   = formatDate(end);
+    datePickerModel.value = { from: exportRange.start, to: exportRange.end };
   }
 };
 
@@ -450,19 +491,23 @@ onMounted(()=>{
   box-shadow: var(--ml-shadow);
 }
 
-.export-date-input {
+.export-date-range-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-r-sm);
   padding: 9px 12px;
   font-size: 13px;
   color: var(--ml-text);
-  font-family: inherit;
-  outline: none;
   margin-top: 5px;
   background: var(--ml-bg);
+  cursor: pointer;
+  box-sizing: border-box;
+  position: relative;
 }
-.export-date-input:focus { border-color: var(--ml-primary); }
+.export-date-range-display:active { border-color: var(--ml-primary); }
 
 .export-field-label {
   display: flex;

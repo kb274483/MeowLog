@@ -28,11 +28,11 @@
             >{{ r.label }}</button>
           </div>
           <div class="grid grid-cols-2 gap-3">
-            <div>
+            <div class="min-w-0">
               <div class="ml-field-label">開始日期</div>
               <input v-model="exportRange.start" type="date" class="export-date-input" />
             </div>
-            <div>
+            <div class="min-w-0">
               <div class="ml-field-label">結束日期</div>
               <input v-model="exportRange.end" type="date" class="export-date-input" />
             </div>
@@ -445,7 +445,7 @@ onMounted(()=>{
 
 .export-section {
   background: var(--ml-surface);
-  border-radius: var(--ml-r-sm-sm);
+  border-radius: var(--ml-r-sm);
   padding: 14px;
   box-shadow: var(--ml-shadow);
 }
@@ -453,7 +453,7 @@ onMounted(()=>{
 .export-date-input {
   width: 100%;
   border: 1px solid var(--ml-border);
-  border-radius: 10px;
+  border-radius: var(--ml-r-sm);
   padding: 9px 12px;
   font-size: 13px;
   color: var(--ml-text);

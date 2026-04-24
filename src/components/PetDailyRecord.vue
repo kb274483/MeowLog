@@ -1,249 +1,200 @@
 <template>
-  <div class="pet-daily-record relative bg-white rounded-lg shadow-md p-4 mb-4">
-    <div v-if="isSaving || isUploading" class="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
-      <q-spinner-dots size="40px" color="amber" />
+  <div class="pet-daily-record ml-card mx-4 mb-6 relative">
+    <!-- Saving overlay -->
+    <div v-if="isSaving || isUploading" class="save-overlay">
+      <q-spinner-dots size="40px" color="primary" />
     </div>
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="text-lg font-semibold text-gray-800">
-        {{ selectedDate.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }) }} 記錄
-      </h3>
-      
-      <button 
-        @click="saveRecord" 
-        class="px-3 py-1.5 rounded-md text-sm font-medium text-white transition-colors"
-        :class="hasChanges && !isSaving ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-300 cursor-not-allowed'"
+
+    <!-- Header row -->
+    <div class="record-header">
+      <div>
+        <div class="record-title">
+          {{ selectedDate.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }) }}
+        </div>
+        <div class="record-sub">日常記錄</div>
+      </div>
+      <button
+        @click="saveRecord"
+        class="save-btn"
+        :class="{ 'save-btn--active': hasChanges && !isSaving, 'save-btn--disabled': !hasChanges || isSaving }"
         :disabled="!hasChanges || isSaving"
       >
-        <span v-if="!isSaving">儲存</span>
-        <span v-else>儲存中...</span>
+        {{ isSaving ? '儲存中...' : '儲存' }}
       </button>
     </div>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <!-- 標記 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          <q-icon name="label" size="16px" class="mr-1" />
-          標記 (可複選)
-        </label>
-        <q-select 
-          v-model="formData.tags" 
-          multiple
-          :options="['回診', '疫苗', '驅蟲', '洗澡', '美容', '其他']"
-          dense
-          outlined
-          use-chips
-          class="w-full"
-        />
-      </div>
-      
-      <div class="grid grid-cols-1 gap-4 mb-2">
-        <!-- 飲食記錄區塊 -->
-        <div class="bg-amber-50 p-3 rounded-lg border border-amber-100">
-          <p class="text-sm font-medium text-amber-800 mb-2 flex items-center">
-            <q-icon name="restaurant" size="16px" class="mr-1" />
-            飲食記錄
-          </p>
-          
-          <!-- 濕食攝取量 -->
-          <div class="mb-3">
-            <label class="block text-xs font-medium text-gray-700 mb-1">
-              濕食攝取量 (罐)
-            </label>
-            <div class="flex flex-wrap gap-1 mb-2">
-              <button
-                v-for="preset in wetFoodPresets"
-                :key="preset.value"
-                type="button"
-                @click="formData.wetFoodAmount = preset.value"
-                class="px-2 py-1 text-xs rounded border transition-colors"
-                :class="isWetFoodPresetActive(preset.value)
-                  ? 'bg-amber-600 text-white border-amber-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-amber-400'"
-              >
-                {{ preset.label }}
-              </button>
-            </div>
-            <input
-              v-model.number="formData.wetFoodAmount"
-              type="number"
-              min="0"
-              step="0.05"
-              placeholder="自訂 (罐)"
-              class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2 text-sm"
-            />
-          </div>
 
-          <!-- 乾糧攝取量 -->
-          <div class="mb-3">
-            <label class="block text-xs font-medium text-gray-700 mb-1">
-              乾糧攝取量 (g)
-            </label>
-            <input 
-              v-model.number="formData.foodAmount" 
-              type="number" 
-              min="0"
-              class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2 text-sm"
-            />
-          </div>
+    <!-- ── Tags ── -->
+    <div class="form-section">
+      <div class="ml-field-label">🏷 標記（可複選）</div>
+      <q-select
+        v-model="formData.tags"
+        multiple
+        :options="dailyTags"
+        dense
+        outlined
+        use-chips
+        class="w-full mt-1"
+        color="primary"
+      />
+    </div>
 
-          <!-- 熱量攝取量 -->
-          <div class="bg-white p-2 rounded border border-amber-200 flex justify-between items-center">
-            <span class="text-xs text-gray-600">總熱量攝取</span>
-            <span class="text-sm font-bold text-amber-700">{{ calculatedCalories }} kcal</span>
-          </div>
+    <!-- ── Food ── -->
+    <div class="form-section">
+      <div class="ml-section-header">
+        <div class="ml-section-header__icon">
+          <q-icon name="restaurant" style="font-size:15px;" />
         </div>
+        <div class="ml-section-header__title">飲食記錄</div>
       </div>
-      
-      <div class="grid grid-cols-2 gap-4">
+
+      <div class="ml-field-label">濕食攝取量（罐）</div>
+      <div class="flex flex-wrap gap-1.5 mt-2 mb-4">
+        <button
+          v-for="preset in wetFoodPresets"
+          :key="preset.value"
+          type="button"
+          @click="formData.wetFoodAmount = preset.value"
+          class="wet-preset"
+          :class="{ active: isWetFoodPresetActive(preset.value) }"
+        >{{ preset.label }}</button>
+      </div>
+      <input
+        v-model.number="formData.wetFoodAmount"
+        type="number" min="0" step="0.05"
+        placeholder="自訂（罐）"
+        class="ml-input mb-1"
+      />
+
+      <div class="ml-field-label mt-4">乾糧攝取量（g）</div>
+      <input
+        v-model.number="formData.foodAmount"
+        type="number" min="0"
+        placeholder="—"
+        class="ml-input mb-1"
+      />
+
+      <div class="ml-cal-summary">
+        <span class="ml-cal-summary__label">總熱量攝取</span>
+        <span
+          class="ml-cal-summary__value"
+          :class="{ 'ml-cal-summary__value--zero': calculatedCalories === 0 }"
+        >{{ calculatedCalories }} kcal</span>
+      </div>
+    </div>
+
+    <!-- ── Symptoms (steppers) ── -->
+    <div class="form-section">
+      <div class="ml-section-header">
+        <div class="ml-section-header__icon">
+          <q-icon name="sick" style="font-size:15px;" />
+        </div>
+        <div class="ml-section-header__title">症狀次數</div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+
         <!-- 嘔吐 -->
-        <div>
-          <div class="flex items-center mb-1">
-            <label class="block text-sm font-medium text-gray-700 mr-3">
-              <q-icon name="sick" size="16px" class="mr-1" />
-              是否嘔吐
-            </label>
-            <q-toggle v-model="formData.hasVomit" color="amber" />
+        <div
+          class="ml-symptom-card"
+          :class="vomitCount > 0 ? 'ml-symptom-card--vomit' : 'ml-symptom-card--inactive'"
+        >
+          <div class="ml-symptom-card__label">嘔吐次數</div>
+          <div class="ml-stepper">
+            <button class="ml-stepper__btn" @click="decrementVomit">−</button>
+            <span class="ml-stepper__value">{{ vomitCount }}</span>
+            <button class="ml-stepper__btn" @click="incrementVomit">+</button>
           </div>
-          
-          <input 
-            v-if="formData.hasVomit"
-            v-model.number="formData.vomitCount" 
-            type="number" 
-            min="1"
-            placeholder="嘔吐次數"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-          />
         </div>
-        
+
         <!-- 腹瀉 -->
-        <div>
-          <div class="flex items-center mb-1">
-            <label class="block text-sm font-medium text-gray-700 mr-3">
-              <q-icon name="wc" size="16px" class="mr-1" />
-              是否腹瀉
-            </label>
-            <q-toggle v-model="formData.hasDiarrhea" color="amber" />
-          </div>
-          
-          <input 
-            v-if="formData.hasDiarrhea"
-            v-model.number="formData.diarrheaCount" 
-            type="number" 
-            min="1"
-            placeholder="腹瀉次數"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-          />
-        </div>
-      </div>
-      
-      <div class="grid grid-cols-2 gap-4 mb-2">
-        <!-- 呼吸次數 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            <span class="material-symbols-outlined text-lg text-gray-700 font-bold">
-              pulmonology
-            </span>
-            呼吸次數 (次/分)
-          </label>
-          <input 
-            v-model.number="formData.respirationRate" 
-            type="number" 
-            min="0"
-            placeholder="正常值: 20-35"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-          />
-        </div>
-        
-        <!-- 心跳次數（新增） -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            <span class="material-symbols-outlined text-lg text-gray-700 font-bold">
-              cardiology
-            </span>
-            心跳次數 (次/分)
-          </label>
-          <input 
-            v-model.number="formData.heartRate" 
-            type="number" 
-            min="0"
-            placeholder="正常值: 120-180"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-          />
-        </div>
-      </div>
-      
-      <div class="grid grid-cols-2 gap-4">
-        <!-- 新增每日體重欄位 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            <q-icon name="monitor_weight" size="16px" class="mr-1" />
-            體重 (kg)
-          </label>
-          <div class="flex">
-            <input 
-              v-model.number="formData.dailyWeight" 
-              type="number" 
-              min="0" 
-              step="0.01"
-              placeholder="Kg"
-              class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-            />
+        <div
+          class="ml-symptom-card"
+          :class="diarrheaCount > 0 ? 'ml-symptom-card--diarrhea' : 'ml-symptom-card--inactive'"
+        >
+          <div class="ml-symptom-card__label">腹瀉次數</div>
+          <div class="ml-stepper">
+            <button class="ml-stepper__btn" @click="decrementDiarrhea">−</button>
+            <span class="ml-stepper__value">{{ diarrheaCount }}</span>
+            <button class="ml-stepper__btn" @click="incrementDiarrhea">+</button>
           </div>
         </div>
-  
-        <!-- 體溫 -->
+
+      </div>
+    </div>
+
+    <!-- ── Vitals ── -->
+    <div class="form-section">
+      <div class="ml-section-header">
+        <div class="ml-section-header__icon">
+          <q-icon name="monitor_heart" style="font-size:15px;" />
+        </div>
+        <div class="ml-section-header__title">生命徵象</div>
+      </div>
+      <div class="grid grid-cols-2 gap-x-5 gap-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            <q-icon name="device_thermostat" size="16px" class="mr-1" />
-            體溫 (°C)
-          </label>
-          <div class="flex">
-            <input 
-              v-model.number="formData.temperature" 
-              type="number" 
-              min="0" 
-              step="0.1"
-              placeholder="°C"
-              class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
-            />
+          <div class="ml-field-label">呼吸次數</div>
+          <div class="flex items-baseline gap-1">
+            <input v-model.number="formData.respirationRate" type="number" min="0" placeholder="—" class="ml-input" />
+            <span class="input-unit">次/分</span>
+          </div>
+          <div class="input-hint">正常: 20–35</div>
+        </div>
+        <div>
+          <div class="ml-field-label">心跳次數</div>
+          <div class="flex items-baseline gap-1">
+            <input v-model.number="formData.heartRate" type="number" min="0" placeholder="—" class="ml-input" />
+            <span class="input-unit">次/分</span>
+          </div>
+          <div class="input-hint">正常: 120–180</div>
+        </div>
+        <div>
+          <div class="ml-field-label">體重</div>
+          <div class="flex items-baseline gap-1">
+            <input v-model.number="formData.dailyWeight" type="number" min="0" step="0.01" placeholder="—" class="ml-input" />
+            <span class="input-unit">kg</span>
+          </div>
+        </div>
+        <div>
+          <div class="ml-field-label">體溫</div>
+          <div class="flex items-baseline gap-1">
+            <input v-model.number="formData.temperature" type="number" min="0" step="0.1" placeholder="—" class="ml-input" />
+            <span class="input-unit">°C</span>
           </div>
         </div>
       </div>
     </div>
-    
-    <!-- 備註 -->
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        <q-icon name="note_alt" size="16px" class="mr-1" />
-        備註
-      </label>
-      <textarea 
-        v-model="formData.notes" 
-        rows="3" 
-        class="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500 focus:ring-opacity-50 p-2"
+
+    <!-- ── Notes ── -->
+    <div class="form-section">
+      <div class="ml-section-header">
+        <div class="ml-section-header__icon">
+          <q-icon name="edit_note" style="font-size:15px;" />
+        </div>
+        <div class="ml-section-header__title">備註</div>
+      </div>
+      <textarea
+        v-model="formData.notes"
+        rows="3"
+        placeholder="今天的狀況…"
+        class="notes-area"
       ></textarea>
     </div>
-    
-    <!-- 使用新的媒體上傳元件 -->
-    <media-uploader
-      v-model="formData.mediaFiles"
-      :is-uploading="isUploading"
-      :upload-progress="uploadProgress"
-      @file-change="handleFileChange"
-    />
+
+    <!-- ── Media ── -->
+    <div class="form-section" style="margin-bottom:0;">
+      <media-uploader
+        v-model="formData.mediaFiles"
+        :is-uploading="isUploading"
+        :upload-progress="uploadProgress"
+        @file-change="handleFileChange"
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
-import { 
-  db,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  serverTimestamp
+import {
+  db, doc, getDoc, setDoc, updateDoc, serverTimestamp
 } from 'src/boot/firebase';
 import { notification } from 'src/boot/notification';
 import { useUserStore } from 'src/stores/userStore';
@@ -252,457 +203,303 @@ import { uploadMediaFiles, getCleanMediaFiles } from 'src/services/mediaUploadSe
 import { cacheGet, cacheSet } from 'src/utils/idbCache';
 
 const props = defineProps({
-  petId: {
-    type: String,
-    required: true
-  },
-  selectedDate: {
-    type: Date,
-    required: true
-  }
+  petId:        { type: String, required: true },
+  selectedDate: { type: Date,   required: true }
 });
 
 const emit = defineEmits(['saved']);
 
-const userStore = useUserStore();
-const isUploading = ref(false);
-const isSaving = ref(false);
+const userStore    = useUserStore();
+const isUploading  = ref(false);
+const isSaving     = ref(false);
 const uploadProgress = ref(0);
-const originalData = ref(null);
+const originalData   = ref(null);
 const currentRecordId = ref(null);
-const loadSeq = ref(0);
+const loadSeq        = ref(0);
 
-// Form data
-const formData = reactive({
-  tags: [],
-  foodAmount: null, // Dry food amount (g)
-  wetFoodAmount: 0, // 0-10
-  calories: null, // Stored calories from DB (historical truth)
-  hasVomit: false,
-  vomitCount: null,
-  hasDiarrhea: false,
-  diarrheaCount: null,
-  dailyWeight: null,
-  respirationRate: null,
-  heartRate: null,
-  temperature: null,
-  notes: '',
-  mediaFiles: []
-});
+// ── Local stepper state (mirrors formData.vomitCount / diarrheaCount) ──
+const vomitCount    = ref(0);
+const diarrheaCount = ref(0);
 
-// Wet food quick-select presets (unit: cans)
-const wetFoodPresets = [
-  { label: '0', value: 0 },
-  { label: '1/4', value: 0.25 },
-  { label: '1/3', value: 0.3333 },
-  { label: '1/2', value: 0.5 },
-  { label: '2/3', value: 0.6667 },
-  { label: '3/4', value: 0.75 },
-  { label: '1', value: 1 },
-  { label: '1½', value: 1.5 },
-  { label: '2', value: 2 },
-];
+const incrementVomit    = () => { vomitCount.value++;    syncSymptoms(); };
+const decrementVomit    = () => { vomitCount.value = Math.max(0, vomitCount.value - 1); syncSymptoms(); };
+const incrementDiarrhea = () => { diarrheaCount.value++; syncSymptoms(); };
+const decrementDiarrhea = () => { diarrheaCount.value = Math.max(0, diarrheaCount.value - 1); syncSymptoms(); };
 
-const isWetFoodPresetActive = (presetValue) => {
-  return Math.abs((formData.wetFoodAmount || 0) - presetValue) < 0.001;
+const syncSymptoms = () => {
+  formData.hasVomit     = vomitCount.value > 0;
+  formData.vomitCount   = vomitCount.value > 0 ? vomitCount.value : null;
+  formData.hasDiarrhea  = diarrheaCount.value > 0;
+  formData.diarrheaCount = diarrheaCount.value > 0 ? diarrheaCount.value : null;
 };
 
-// Calculate calories based on CURRENT family settings (for live edits)
+// Keep local steppers in sync when data loads from DB
+const applySteppersFromFormData = () => {
+  vomitCount.value    = formData.hasVomit    ? (formData.vomitCount    || 1) : 0;
+  diarrheaCount.value = formData.hasDiarrhea ? (formData.diarrheaCount || 1) : 0;
+};
+
+const dailyTags = ref(['回診', '疫苗', '驅蟲', '洗澡', '美容', '其他'])
+
+// ── Form data ──
+const formData = reactive({
+  tags:            [],
+  foodAmount:      null,
+  wetFoodAmount:   0,
+  calories:        null,
+  hasVomit:        false,
+  vomitCount:      null,
+  hasDiarrhea:     false,
+  diarrheaCount:   null,
+  dailyWeight:     null,
+  respirationRate: null,
+  heartRate:       null,
+  temperature:     null,
+  notes:           '',
+  mediaFiles:      []
+});
+
+// ── Wet food presets ──
+const wetFoodPresets = [
+  { label: '0',  value: 0      },
+  { label: '1/4',value: 0.25   },
+  { label: '1/3',value: 0.3333 },
+  { label: '1/2',value: 0.5    },
+  { label: '2/3',value: 0.6667 },
+  { label: '3/4',value: 0.75   },
+  { label: '1',  value: 1      },
+  { label: '1½', value: 1.5    },
+  { label: '2',  value: 2      },
+];
+
+const isWetFoodPresetActive = (presetValue) => Math.abs((formData.wetFoodAmount || 0) - presetValue) < 0.001;
+
+// ── Calories ──
 const caloriesFromInputs = computed(() => {
   if (!userStore.family) return 0;
-  
-  const wetCalsPerUnit = userStore.family.wetFoodCalories || 0;
-  const dryCalsPerGram = userStore.family.dryFoodCalories || 0;
-
-  const wetCals = (formData.wetFoodAmount || 0) * wetCalsPerUnit;
-  const dryCals = (formData.foodAmount || 0) * dryCalsPerGram;
-  
+  const wetCals = (formData.wetFoodAmount || 0) * (userStore.family.wetFoodCalories || 0);
+  const dryCals = (formData.foodAmount    || 0) * (userStore.family.dryFoodCalories || 0);
   return Math.round(wetCals + dryCals);
 });
 
-// When DB has calories, prefer it unless the user changed intake amounts for the day
 const shouldUseStoredCalories = computed(() => {
   if (!originalData.value) return false;
-  const hasStoredCalories = formData.calories !== null && formData.calories !== undefined;
-  if (!hasStoredCalories) return false;
-
-  const inputsUnchanged =
-    formData.foodAmount === originalData.value.foodAmount &&
-    formData.wetFoodAmount === originalData.value.wetFoodAmount;
-
-  return inputsUnchanged;
+  const hasStored = formData.calories !== null && formData.calories !== undefined;
+  if (!hasStored) return false;
+  return formData.foodAmount === originalData.value.foodAmount &&
+         formData.wetFoodAmount === originalData.value.wetFoodAmount;
 });
 
-// Calories shown in UI / saved to DB
-const calculatedCalories = computed(() => {
-  if (shouldUseStoredCalories.value) {
-    return Number(formData.calories) || 0;
-  }
-  return caloriesFromInputs.value;
-});
+const calculatedCalories = computed(() =>
+  shouldUseStoredCalories.value ? (Number(formData.calories) || 0) : caloriesFromInputs.value
+);
 
-// Detect changes by comparing with original data
+// ── Change detection (include stepper counts) ──
 const hasChanges = computed(() => {
   if (!originalData.value) return false;
-  
-  // Simple comparison of important fields
   return JSON.stringify({
-    tags: formData.tags,
-    foodAmount: formData.foodAmount,
-    wetFoodAmount: formData.wetFoodAmount,
-    hasVomit: formData.hasVomit,
-    vomitCount: formData.vomitCount,
-    hasDiarrhea: formData.hasDiarrhea,
-    diarrheaCount: formData.diarrheaCount,
-    dailyWeight: formData.dailyWeight,
-    respirationRate: formData.respirationRate,
-    heartRate: formData.heartRate,
-    temperature: formData.temperature,
-    notes: formData.notes,
-    mediaFilesCount: formData.mediaFiles.length
+    tags: formData.tags, foodAmount: formData.foodAmount, wetFoodAmount: formData.wetFoodAmount,
+    hasVomit: formData.hasVomit, vomitCount: formData.vomitCount,
+    hasDiarrhea: formData.hasDiarrhea, diarrheaCount: formData.diarrheaCount,
+    dailyWeight: formData.dailyWeight, respirationRate: formData.respirationRate,
+    heartRate: formData.heartRate, temperature: formData.temperature,
+    notes: formData.notes, mediaFilesCount: formData.mediaFiles.length
   }) !== JSON.stringify({
-    tags: originalData.value.tags,
-    foodAmount: originalData.value.foodAmount,
-    wetFoodAmount: originalData.value.wetFoodAmount,
-    hasVomit: originalData.value.hasVomit,
-    vomitCount: originalData.value.vomitCount,
-    hasDiarrhea: originalData.value.hasDiarrhea,
-    diarrheaCount: originalData.value.diarrheaCount,
-    dailyWeight: originalData.value.dailyWeight,
-    respirationRate: originalData.value.respirationRate,
-    heartRate: originalData.value.heartRate,
-    temperature: originalData.value.temperature,
-    notes: originalData.value.notes,
-    mediaFilesCount: originalData.value.mediaFiles.length
+    tags: originalData.value.tags, foodAmount: originalData.value.foodAmount, wetFoodAmount: originalData.value.wetFoodAmount,
+    hasVomit: originalData.value.hasVomit, vomitCount: originalData.value.vomitCount,
+    hasDiarrhea: originalData.value.hasDiarrhea, diarrheaCount: originalData.value.diarrheaCount,
+    dailyWeight: originalData.value.dailyWeight, respirationRate: originalData.value.respirationRate,
+    heartRate: originalData.value.heartRate, temperature: originalData.value.temperature,
+    notes: originalData.value.notes, mediaFilesCount: originalData.value.mediaFiles.length
   });
 });
 
-// Listen for date changes to load new data
-watch(() => props.selectedDate, (newDate) => {
-  loadDailyRecord(newDate);
-}, { immediate: false });
+watch(() => props.selectedDate, (newDate) => { loadDailyRecord(newDate); });
+onMounted(() => { loadDailyRecord(props.selectedDate); });
 
-// Load record data when component mounts
-onMounted(() => {
-  loadDailyRecord(props.selectedDate);
-});
-
-// Load daily record from Firestore
+// ── Load from Firestore ──
 const loadDailyRecord = async (date) => {
   if (!userStore.isLoggedIn || !userStore.hasFamily || !props.petId) return;
-  
   try {
     const seq = ++loadSeq.value;
-    // Format date as YYYY-MM-DD for record ID
     const dateString = formatDate(date);
-    const recordId = `${props.petId}_${dateString}`;
+    const recordId   = `${props.petId}_${dateString}`;
     currentRecordId.value = recordId;
-
     const cacheKey = `petDailyRecord:${userStore.family.id}:${recordId}`;
-    
-    // Default values
+
     const defaultData = {
-      tags: [],
-      foodAmount: null,
-      wetFoodAmount: 0,
-      calories: null,
-      hasVomit: false,
-      vomitCount: null,
-      hasDiarrhea: false,
-      diarrheaCount: null,
-      dailyWeight: null,
-      respirationRate: null,
-      heartRate: null,
-      temperature: null,
-      notes: '',
-      mediaFiles: [],
+      tags: [], foodAmount: null, wetFoodAmount: 0, calories: null,
+      hasVomit: false, vomitCount: null, hasDiarrhea: false, diarrheaCount: null,
+      dailyWeight: null, respirationRate: null, heartRate: null, temperature: null,
+      notes: '', mediaFiles: []
     };
 
-    // Cache-first：先用快取秒顯示，再抓 Firestore 更新最新
+    // Cache-first
     const cached = await cacheGet(cacheKey, { maxAgeMs: 1000 * 60 * 60 * 24 * 30 });
     if (cached && typeof cached === 'object') {
       Object.assign(formData, {
-        ...defaultData,
-        ...cached,
-        mediaFiles: (cached.mediaFiles || []).map(file => ({
-          ...file,
-          loading: false,
-          loadError: false
-        }))
+        ...defaultData, ...cached,
+        mediaFiles: (cached.mediaFiles || []).map(f => ({ ...f, loading: false, loadError: false }))
       });
       originalData.value = JSON.parse(JSON.stringify(formData));
+      applySteppersFromFormData();
     }
 
     const recordRef = doc(db, 'petDailyRecords', recordId);
     const recordDoc = await getDoc(recordRef);
-    
+
     if (recordDoc.exists()) {
-      // Load existing data
       const recordData = recordDoc.data();
-      
-      // Migration: Handle old tag field
-      if (recordData.tag && !recordData.tags) {
-        recordData.tags = [recordData.tag];
-      } else if (!recordData.tags) {
-        recordData.tags = [];
-      }
+      if (recordData.tag && !recordData.tags) recordData.tags = [recordData.tag];
+      else if (!recordData.tags) recordData.tags = [];
+      if (!recordData.wetFoodAmountV2) recordData.wetFoodAmount = (recordData.wetFoodAmount || 0) / 10;
 
-      // Migration: Handle old wetFoodAmount format (integer 0–10 = tenths of a can)
-      // New format stores decimal cans directly (e.g. 0.5 = half a can), marked by wetFoodAmountV2: true
-      if (!recordData.wetFoodAmountV2) {
-        recordData.wetFoodAmount = (recordData.wetFoodAmount || 0) / 10;
-      }
-      
-      // Process media files data, ensure each file has correct type flags
-      const mediaFiles = (recordData.mediaFiles || []).map(file => ({
-        ...file,
-        loading: false,
-        loadError: false
-      }));
-      
-      // Set form data
-      // 若使用者已開始編輯，不用網路資料覆蓋
+      const mediaFiles = (recordData.mediaFiles || []).map(f => ({ ...f, loading: false, loadError: false }));
       if (seq === loadSeq.value && currentRecordId.value === recordId && !hasChanges.value) {
-        Object.assign(formData, {
-          ...defaultData,
-          ...recordData,
-          mediaFiles
-        });
-        // Save original data for change detection
+        Object.assign(formData, { ...defaultData, ...recordData, mediaFiles });
         originalData.value = JSON.parse(JSON.stringify(formData));
+        applySteppersFromFormData();
       }
 
-      // Cache a sanitized shape (avoid Firestore Timestamp in cache)
-      const {...cacheSafeData } = recordData || {};
+      const { ...cacheSafeData } = recordData || {};
       void cacheSet(cacheKey, {
         ...cacheSafeData,
-        mediaFiles: (recordData.mediaFiles || []).map(file => ({
-          url: file?.url || null,
-          type: file?.type || 'image',
-          name: file?.name || 'file',
-          timestamp: file?.timestamp || Date.now()
-        })).filter(f => !!f.url)
+        mediaFiles: (recordData.mediaFiles || [])
+          .map(f => ({ url: f?.url||null, type: f?.type||'image', name: f?.name||'file', timestamp: f?.timestamp||Date.now() }))
+          .filter(f => !!f.url)
       });
     } else {
-      // Set to default values
       if (seq === loadSeq.value && !cached) {
         Object.assign(formData, defaultData);
         originalData.value = JSON.parse(JSON.stringify(defaultData));
+        applySteppersFromFormData();
       }
     }
   } catch (error) {
     console.error('Failed to load daily record:', error);
-    // 若已有快取顯示，離線/錯誤就先不干擾使用者
-    if (!originalData.value) {
-      notification.error('載入日期記錄失敗');
-    }
+    if (!originalData.value) notification.error('載入日期記錄失敗');
   }
 };
 
-// Format date as YYYY-MM-DD
 const formatDate = (date) => {
   const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
-// Save record with uploaded media
+// ── Save ──
 const saveRecord = async () => {
   if (!userStore.isLoggedIn || !userStore.hasFamily || !props.petId) {
-    notification.error('未登入或無家庭資訊');
-    return;
+    notification.error('未登入或無家庭資訊'); return;
   }
-  
   try {
     isSaving.value = true;
-    // Check if there are new files to upload
-    const hasNewFiles = formData.mediaFiles.some(file => file.isNew);
-    
-    // Set upload status
+    const hasNewFiles = formData.mediaFiles.some(f => f.isNew);
     isUploading.value = hasNewFiles;
     uploadProgress.value = 0;
-    
-    // If there are new files, add a delay to ensure UI updates
+
     if (hasNewFiles) {
-      // Lock page scroll
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
       document.body.style.height = '100%';
-      
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    
-    // Format date for record ID and storage path
+
     const dateString = formatDate(props.selectedDate);
-    const recordId = `${props.petId}_${dateString}`;
-    
-    const uploadOptions = {
-      familyId: userStore.family.id,
-      petId: props.petId,
-      dateString: dateString
-    };
-    
-    // Update progress via callback
-    const handleProgress = (progress) => {
-      uploadProgress.value = progress;
-    };
-    
-    // Upload media files
+    const recordId   = `${props.petId}_${dateString}`;
+    const uploadOptions = { familyId: userStore.family.id, petId: props.petId, dateString };
+
     let updatedMediaFiles = [...formData.mediaFiles];
     if (hasNewFiles) {
       try {
-        updatedMediaFiles = await uploadMediaFiles(
-          formData.mediaFiles, 
-          uploadOptions, 
-          handleProgress
-        );
+        updatedMediaFiles = await uploadMediaFiles(formData.mediaFiles, uploadOptions, p => { uploadProgress.value = p; });
       } catch (uploadError) {
         console.error('媒體上傳失敗:', uploadError);
         notification.error('部分媒體文件上傳失敗，但記錄仍會儲存');
-        // 繼續執行，但標記上傳失敗的文件
-        updatedMediaFiles = formData.mediaFiles.map(file => {
-          if (file.isNew) {
-            return { ...file, loadError: true };
-          }
-          return file;
-        });
+        updatedMediaFiles = formData.mediaFiles.map(f => f.isNew ? { ...f, loadError: true } : f);
       }
     }
-    
-    // Update form data
     formData.mediaFiles = updatedMediaFiles;
-    
-    // 處理媒體文件，確保無 undefined 值
+
     let cleanMediaFiles = [];
     try {
       cleanMediaFiles = getCleanMediaFiles(formData.mediaFiles);
-    } catch (cleanError) {
-      console.error('清理媒體文件失敗:', cleanError);
-      // 手動清理媒體文件數據
-      cleanMediaFiles = formData.mediaFiles.map(file => {
-        // 只保留必要字段，並確保沒有 undefined 值
-        const cleanFile = {
-          url: file.url || null,
-          type: file.type || 'image',
-          name: file.name || 'file',
-          timestamp: file.timestamp || Date.now()
-        };
-        return cleanFile;
-      }).filter(file => file.url); // 過濾掉沒有 URL 的文件
+    } catch {
+      cleanMediaFiles = formData.mediaFiles
+        .map(f => ({ url: f.url||null, type: f.type||'image', name: f.name||'file', timestamp: f.timestamp||Date.now() }))
+        .filter(f => f.url);
     }
-    
-    // 準備記錄數據，確保所有字段都不為 undefined
+
     const recordData = {
-      petId: props.petId,
-      familyId: userStore.family.id,
-      date: dateString,
-      tags: formData.tags || [],
-      // Deprecated: tag
-      tag: formData.tags.length > 0 ? formData.tags[0] : null, 
-      foodAmount: formData.foodAmount || null,
-      wetFoodAmount: formData.wetFoodAmount || 0,
+      petId:           props.petId,
+      familyId:        userStore.family.id,
+      date:            dateString,
+      tags:            formData.tags || [],
+      tag:             formData.tags.length > 0 ? formData.tags[0] : null,
+      foodAmount:      formData.foodAmount || null,
+      wetFoodAmount:   formData.wetFoodAmount || 0,
       wetFoodAmountV2: true,
-      calories: calculatedCalories.value,
-      hasVomit: formData.hasVomit || false,
-      vomitCount: formData.hasVomit ? (formData.vomitCount || 1) : null,
-      hasDiarrhea: formData.hasDiarrhea || false,
-      diarrheaCount: formData.hasDiarrhea ? (formData.diarrheaCount || 1) : null,
-      dailyWeight: formData.dailyWeight || null,
+      calories:        calculatedCalories.value,
+      hasVomit:        formData.hasVomit || false,
+      vomitCount:      formData.hasVomit ? (formData.vomitCount || 1) : null,
+      hasDiarrhea:     formData.hasDiarrhea || false,
+      diarrheaCount:   formData.hasDiarrhea ? (formData.diarrheaCount || 1) : null,
+      dailyWeight:     formData.dailyWeight || null,
       respirationRate: formData.respirationRate || null,
-      heartRate: formData.heartRate || null,
-      temperature: formData.temperature || null,
-      notes: formData.notes || null,
-      mediaFiles: cleanMediaFiles || [],
-      updatedAt: serverTimestamp(),
-      updatedBy: userStore.user.uid
+      heartRate:       formData.heartRate || null,
+      temperature:     formData.temperature || null,
+      notes:           formData.notes || null,
+      mediaFiles:      cleanMediaFiles || [],
+      updatedAt:       serverTimestamp(),
+      updatedBy:       userStore.user.uid
     };
-    
-    // 最後檢查，確保沒有 undefined 值
-    Object.keys(recordData).forEach(key => {
-      if (recordData[key] === undefined) {
-        recordData[key] = null;
-      }
-    });
-    
-    // Save to Firestore
+    Object.keys(recordData).forEach(k => { if (recordData[k] === undefined) recordData[k] = null; });
+
     await setDoc(doc(db, 'petDailyRecords', recordId), recordData);
 
-    // Update IndexedDB cache (fast switching / reopen)
+    // Update IDB cache
     const cacheKey = `petDailyRecord:${userStore.family.id}:${recordId}`;
-    const {...cacheSafeData } = recordData || {};
+    const { ...cacheSafeData } = recordData || {};
     void cacheSet(cacheKey, {
       ...cacheSafeData,
-      mediaFiles: (cleanMediaFiles || []).map(file => ({
-        url: file?.url || null,
-        type: file?.type || 'image',
-        name: file?.name || 'file',
-        timestamp: file?.timestamp || Date.now()
-      })).filter(f => !!f.url)
+      mediaFiles: (cleanMediaFiles || []).map(f => ({ url:f?.url||null, type:f?.type||'image', name:f?.name||'file', timestamp:f?.timestamp||Date.now() })).filter(f=>!!f.url)
     });
 
-    // Strong consistency: also update the monthly calendar summary cache immediately
-    // so the calendar badges match the saved record without waiting for background refresh.
+    // Update monthly summary cache
     try {
-      const ym = String(dateString || '').slice(0, 7); // YYYY-MM
+      const ym = String(dateString || '').slice(0, 7);
       const summaryKey = `petDailySummary:${userStore.family.id}:${props.petId}:${ym}`;
-      const existing = (await cacheGet(summaryKey, { maxAgeMs: 1000 * 60 * 60 * 24 * 30 })) || {};
-
+      const existing = (await cacheGet(summaryKey, { maxAgeMs: 1000*60*60*24*30 })) || {};
       const tags = recordData.tags || (recordData.tag ? [recordData.tag] : []);
-      const summary = {
-        hasRecord: true,
-        tag: recordData.tag || null,
-        tags,
-        hasNotes: !!recordData.notes,
-        hasVomit: recordData.hasVomit || false,
-        hasDiarrhea: recordData.hasDiarrhea || false,
-        dailyWeight: recordData.dailyWeight || null,
-        temperature: recordData.temperature || null
-      };
-
-      // merge into month map (keyed by YYYY-MM-DD)
+      const summary = { hasRecord:true, tag:recordData.tag||null, tags, hasNotes:!!recordData.notes, hasVomit:recordData.hasVomit||false, hasDiarrhea:recordData.hasDiarrhea||false, dailyWeight:recordData.dailyWeight||null, temperature:recordData.temperature||null };
       const merged = { ...(existing && typeof existing === 'object' ? existing : {}) };
       merged[dateString] = summary;
       void cacheSet(summaryKey, merged);
-    } catch {
-      // best-effort; do not block save UX
-    }
-    // Keep local state consistent with what we saved (prevents reverting to old calories)
+    } catch { /* best-effort */ }
+
     formData.calories = recordData.calories;
     originalData.value = JSON.parse(JSON.stringify(formData));
-    
-    // Update pet weight if filled
-    if (formData.dailyWeight) {
-      await updatePetWeight(formData.dailyWeight);
-    }
-    
-    if (formData.mediaFiles.some(file => file.loadError)) {
-      notification.warning('記錄已儲存，但部分媒體文件上傳失敗');
-    } else {
-      notification.success('記錄已儲存');
-    }
+
+    if (formData.dailyWeight) await updatePetWeight(formData.dailyWeight);
+
+    if (formData.mediaFiles.some(f => f.loadError)) notification.warning('記錄已儲存，但部分媒體文件上傳失敗');
+    else notification.success('記錄已儲存');
+
     emit('saved', {
-      date: props.selectedDate,
-      hasRecord: true,
+      date: props.selectedDate, hasRecord: true,
       tags: formData.tags || [],
-      tag: formData.tags.length > 0 ? formData.tags[0] : null, // backward compatibility
+      tag: formData.tags.length > 0 ? formData.tags[0] : null,
       hasNotes: !!formData.notes,
-      hasVomit: formData.hasVomit,
-      hasDiarrhea: formData.hasDiarrhea,
-      weightUpdated: !!formData.dailyWeight,
-      dailyWeight: formData.dailyWeight || null,
+      hasVomit: formData.hasVomit, hasDiarrhea: formData.hasDiarrhea,
+      weightUpdated: !!formData.dailyWeight, dailyWeight: formData.dailyWeight || null,
       temperature: formData.temperature || null
     });
-    
   } catch (error) {
     console.error('儲存記錄失敗:', error);
     notification.error('儲存記錄失敗: ' + (error.message || '未知錯誤'));
   } finally {
     setTimeout(() => {
-      isUploading.value = false;
-      uploadProgress.value = 0;
+      isUploading.value = false; uploadProgress.value = 0;
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
@@ -712,31 +509,91 @@ const saveRecord = async () => {
   }
 };
 
-// Update pet weight function
 const updatePetWeight = async (weight) => {
   try {
-    // Get pet data reference
-    const petRef = doc(db, 'pets', props.petId);
-    
-    // Use update operation, only update weight field
-    await updateDoc(petRef, {
-      weight: weight,
-      weightUpdatedAt: serverTimestamp()
-    });
-    
-    console.log('寵物體重已更新:', weight);
-  } catch (error) {
-    console.error('更新寵物體重失敗:', error);
-  }
+    await updateDoc(doc(db, 'pets', props.petId), { weight, weightUpdatedAt: serverTimestamp() });
+  } catch (error) { console.error('更新寵物體重失敗:', error); }
 };
 
-// 在 PetDailyRecord.vue 中添加 handleFileChange 函數（如果尚未存在）
-const handleFileChange = (newFiles) => {
-  console.log('收到新文件:', newFiles);
-  
-  // 如果需要進行額外處理，可以在這裡添加
-  // 例如，檢查文件大小、限制上傳數量等
-  
-  // 這個函數主要用於除錯，實際上 v-model 已經處理了文件更新
-};
-</script> 
+const handleFileChange = (newFiles) => { console.log('收到新文件:', newFiles); };
+</script>
+
+<style scoped>
+.pet-daily-record {
+  padding: 18px 16px 20px;
+  position: relative;
+}
+
+/* ── Saving overlay ── */
+.save-overlay {
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,0.75);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10; border-radius: var(--ml-r-sm);
+}
+
+/* ── Header ── */
+.record-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.record-title {
+  font-size: 14px; font-weight: 700; color: var(--ml-text);
+  line-height: 1.3;
+}
+
+.record-sub {
+  font-size: 11px; color: var(--ml-text-muted); margin-top: 2px;
+}
+
+.save-btn {
+  flex-shrink: 0;
+  border: none; border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  transition: all 0.15s;
+}
+.save-btn--active {
+  background: linear-gradient(145deg, #F5A030 0%, #D97810 100%);
+  color: #fff;
+}
+.save-btn--disabled {
+  background: var(--ml-border);
+  color: var(--ml-text-muted);
+  cursor: not-allowed;
+}
+
+/* ── Form sections ── */
+.form-section {
+  padding-bottom: .5rem;
+  margin-bottom: .5rem;
+  /* border-bottom: 1px solid var(--ml-border); */
+}
+.form-section:last-child {
+  margin-bottom: 0; padding-bottom: 0; border-bottom: none;
+}
+
+/* ── Input hints ── */
+.input-unit {
+  font-size: 12px; color: var(--ml-text-muted);
+  flex-shrink: 0; margin-left: 4px;
+}
+.input-hint {
+  font-size: 10px; color: var(--ml-text-muted); margin-top: 3px;
+}
+
+/* ── Notes textarea ── */
+.notes-area {
+  width: 100%;
+  border: none;
+  border-bottom: 1.5px solid var(--ml-border);
+  padding: 6px 0;
+  font-size: 14px; color: var(--ml-text);
+  background: transparent; outline: none; resize: none;
+  font-family: inherit; line-height: 1.6; margin-top: 6px;
+}
+.notes-area:focus { border-bottom-color: var(--ml-primary); }
+.notes-area::placeholder { color: var(--ml-text-muted); }
+</style>

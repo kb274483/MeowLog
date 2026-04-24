@@ -1,25 +1,14 @@
 // Quasar SCSS (& Sass) Variables
-// --------------------------------------------------
-// To customize the look and feel of this app, you can override
-// the Sass/SCSS variables found in Quasar's source Sass/SCSS files.
+// MeowLog Redesign — 2026
 
-// Check documentation for full list of Quasar variables
+$primary   : #E8911C;
+$secondary : #7A6640;
+$accent    : #C4720E;
 
-// Your own variables (that are declared here) and Quasar's own
-// ones will be available out of the box in your .vue/.scss/.sass files
+$dark      : #261E0A;
+$dark-page : #FAF8F5;
 
-// It's highly recommended to change the default colors
-// to match your app's branding.
-// Tip: Use the "Theme Builder" on Quasar's documentation website.
-
-$primary   : #1976D2;
-$secondary : #26A69A;
-$accent    : #9C27B0;
-
-$dark      : #1D1D1D;
-$dark-page : #121212;
-
-$positive  : #21BA45;
-$negative  : #C10015;
-$info      : #31CCEC;
-$warning   : #F2C037;
+$positive  : #2E9458;
+$negative  : #C43C28;
+$info      : #2860B0;
+$warning   : #B87010;

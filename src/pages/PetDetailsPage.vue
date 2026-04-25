@@ -468,7 +468,7 @@ watch(currentDate, async () => {
 
 /* ── Sub-header ── */
 .pet-sub-header {
-  background: linear-gradient(145deg, #F5A030 0%, #D97810 100%);
+  background-color: #EC8A20;
   position: fixed;
   left: 0; right: 0;
   z-index: 20;

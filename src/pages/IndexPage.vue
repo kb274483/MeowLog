@@ -406,7 +406,7 @@ const saveSettings = async () => {
 
 /* ── Family header card ── */
 .family-header-card {
-  background: linear-gradient(145deg, #F5A030 0%, #D97810 100%);
+  background: #EC8A20;
   padding: 8px 16px 20px;
   margin-bottom: 20px;
 }

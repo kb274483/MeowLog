@@ -21,10 +21,25 @@
 import InstallPrompt from 'src/components/InstallPrompt.vue';
 </script>
 
+<style>
+/* 讓 mobile overscroll 下拉露出的背景與 header 同色 */
+html,
+body,
+.q-layout,
+.q-page-container {
+  background-color: #EC8A20;
+}
+
+html,
+body {
+  overscroll-behavior-y: none;
+}
+</style>
+
 <style scoped>
 .ml-main-header {
-  background: linear-gradient(145deg, #F5A030 0%, #D97810 100%);
-  box-shadow: 0 2px 12px rgba(180, 100, 10, 0.25);
+  background: #EC8A20;
+  box-shadow: none;
 }
 
 .ml-toolbar {

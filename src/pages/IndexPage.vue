@@ -241,6 +241,19 @@ onMounted(async () => {
   }
 
   const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.get('openSettings') === '1') {
+    const tryOpen = () => {
+      if (userStore.hasFamily) {
+        openSettings()
+        window.history.replaceState({}, document.title, window.location.pathname)
+        return true
+      }
+      return false
+    }
+    if (!tryOpen()) {
+      const stop = watch(() => userStore.hasFamily, (v) => { if (v) { tryOpen(); stop() } })
+    }
+  }
   const joinId = urlParams.get('join')
   if (joinId) {
     const unsubscribe = auth.onAuthStateChanged(user => {

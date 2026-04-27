@@ -80,6 +80,14 @@
           :class="{ 'ml-cal-summary__value--zero': calculatedCalories === 0 }"
         >{{ calculatedCalories }} kcal</span>
       </div>
+
+      <div v-if="needsCalorieSettings" class="cal-setting-hint">
+        <q-icon name="info" style="font-size:14px;" />
+        <span>尚未設定熱量參數，無法計算總熱量</span>
+        <button type="button" @click="goToCalorieSettings" class="cal-setting-link">
+          前往設定 →
+        </button>
+      </div>
     </div>
 
     <!-- ── Symptoms (steppers) ── -->
@@ -193,6 +201,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   db, doc, getDoc, setDoc, updateDoc, serverTimestamp
 } from 'src/boot/firebase';
@@ -210,6 +219,7 @@ const props = defineProps({
 const emit = defineEmits(['saved']);
 
 const userStore    = useUserStore();
+const router       = useRouter();
 const isUploading  = ref(false);
 const isSaving     = ref(false);
 const uploadProgress = ref(0);
@@ -268,8 +278,8 @@ const wetFoodPresets = [
   { label: '2/3',value: 0.6667 },
   { label: '3/4',value: 0.75   },
   { label: '1',  value: 1      },
-  { label: '1½', value: 1.5    },
-  { label: '2',  value: 2      },
+  // { label: '1½', value: 1.5    },
+  // { label: '2',  value: 2      },
 ];
 
 const isWetFoodPresetActive = (presetValue) => Math.abs((formData.wetFoodAmount || 0) - presetValue) < 0.001;
@@ -293,6 +303,20 @@ const shouldUseStoredCalories = computed(() => {
 const calculatedCalories = computed(() =>
   shouldUseStoredCalories.value ? (Number(formData.calories) || 0) : caloriesFromInputs.value
 );
+
+const needsCalorieSettings = computed(() => {
+  const family = userStore.family;
+  if (!family) return false;
+  const wetMissing = !family.wetFoodCalories;
+  const dryMissing = !family.dryFoodCalories;
+  const hasWetInput = (formData.wetFoodAmount || 0) > 0;
+  const hasDryInput = (formData.foodAmount || 0) > 0;
+  return (hasWetInput && wetMissing) || (hasDryInput && dryMissing);
+});
+
+const goToCalorieSettings = () => {
+  router.push({ path: '/', query: { openSettings: '1' } });
+};
 
 // ── Change detection (include stepper counts) ──
 const hasChanges = computed(() => {
@@ -596,4 +620,31 @@ const handleFileChange = (newFiles) => { console.log('收到新文件:', newFile
 }
 .notes-area:focus { border-bottom-color: var(--ml-primary); }
 .notes-area::placeholder { color: var(--ml-text-muted); }
+
+/* ── Calorie settings hint ── */
+.cal-setting-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #FFF7E6;
+  border: 1px solid #FFE0A3;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #8A5A00;
+}
+.cal-setting-link {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #D97810;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+.cal-setting-link:hover { text-decoration: underline; }
 </style>

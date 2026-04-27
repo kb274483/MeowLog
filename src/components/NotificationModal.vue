@@ -1,93 +1,95 @@
 <template>
   <transition
-    enter-active-class="transition duration-300 ease-out"
-    enter-from-class="transform opacity-0 scale-95"
-    enter-to-class="transform opacity-100 scale-100"
-    leave-active-class="transition duration-200 ease-in"
-    leave-from-class="transform opacity-100 scale-100"
-    leave-to-class="transform opacity-0 scale-95"
+    enter-active-class="transition duration-200 ease-out"
+    enter-from-class="opacity-0 translate-y-1 scale-[0.97]"
+    enter-to-class="opacity-100 translate-y-0 scale-100"
+    leave-active-class="transition duration-150 ease-in"
+    leave-from-class="opacity-100 translate-y-0 scale-100"
+    leave-to-class="opacity-0 translate-y-1 scale-[0.97]"
   >
-    <div 
-      v-if="show" 
-      class="fixed inset-0 z-[10000] flex items-center justify-center px-4 py-6"
+    <div
+      v-if="show"
+      class="fixed inset-0 z-[10000] flex items-center justify-center px-4"
     >
-      <div 
-        class="fixed inset-0 transition-opacity"
+      <!-- Backdrop -->
+      <div
+        class="absolute inset-0 bg-black/40"
         @click="onClose"
+      />
+
+      <!-- Modal card -->
+      <div
+        class="relative bg-white rounded-2xl overflow-hidden w-80"
+        :style="cardStyle"
       >
-        <div class="absolute inset-0 bg-black opacity-50"></div>
-      </div>
-      
-      <div 
-        class="bg-white rounded-lg px-6 pt-5 pb-6 overflow-hidden shadow-xl transform transition-all w-[60%] sm:w-1/2"
-        :class="typeClasses"
-      >
-        <div class="flex justify-between items-start">
-          <div class="flex items-center">
-            <div 
-              class="rounded-full p-2 mr-3" 
-              :class="iconBgClass"
+        <div class="p-4 pb-3.5">
+
+          <!-- Main row: icon | text | close -->
+          <div class="flex items-start gap-3">
+
+            <!-- Icon -->
+            <div
+              class="flex-shrink-0 flex items-center justify-center rounded-[13px] mt-0.5"
+              :style="iconStyle"
             >
-              <span 
-                class="flex items-center justify-center h-6 w-6"
-                :class="iconClass"
-              >
-                <template v-if="type === 'success'">
-                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                </template>
-                <template v-else-if="type === 'error'">
-                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </template>
-                <template v-else-if="type === 'info'">
-                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                </template>
-                <template v-else-if="type === 'warning'">
-                  <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                  </svg>
-                </template>
-              </span>
+              <component :is="currentIcon" class="w-5 h-5 text-white" />
             </div>
-            <div>
-              <h3 
-                class="text-lg font-medium"
-                :class="titleClass"
-              >
+
+            <!-- Text -->
+            <div class="flex-1 min-w-0">
+              <p class="font-bold text-[15px] text-[#261E0A] tracking-tight mb-0.5">
                 {{ title }}
-              </h3>
+              </p>
+              <p class="text-[13px] text-[#7A6640] leading-relaxed">
+                {{ message }}
+              </p>
             </div>
+
+            <!-- Close -->
+            <button
+              class="flex-shrink-0 flex items-center justify-center w-[26px] h-[26px] rounded-lg mt-0.5
+                     bg-[#FAF8F5] border border-[#EDE5D8] hover:bg-[#EDE5D8] transition-colors"
+              @click="onClose"
+            >
+              <svg class="w-3.5 h-3.5 text-[#B8A882]" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" viewBox="0 0 24 24">
+                <path d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
           </div>
-          
-          <button
-            class="text-gray-400 hover:text-gray-600 focus:outline-none"
-            @click="onClose"
-          >
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-        
-        <div class="mt-3">
-          <p class="text-sm text-gray-500">
-            {{ message }}
-          </p>
-        </div>
-        
-        <div class="mt-5 sm:mt-6">
-          <button
-            class="w-full rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none sm:text-sm"
-            :class="buttonClass"
-            @click="onClose"
-          >
-            {{ buttonText }}
-          </button>
+
+          <!-- Divider -->
+          <div class="h-px bg-[#EDE5D8] my-3" />
+
+          <!-- Footer: progress bar + button -->
+          <div class="flex items-center gap-3">
+
+            <!-- Auto-close progress bar -->
+            <div
+              v-if="autoClose"
+              class="flex-1 h-1 rounded-full overflow-hidden"
+              :style="{ background: config.colorL }"
+            >
+              <div
+                :key="progressKey"
+                class="h-full rounded-full origin-left"
+                :style="{
+                  background: config.color,
+                  animation: `ml-progress-shrink ${duration}ms linear forwards`,
+                }"
+              />
+            </div>
+
+            <!-- Confirm button -->
+            <button
+              class="flex-shrink-0 px-[18px] py-[7px] rounded-[10px] font-bold text-[13px]
+                     text-white transition-opacity hover:opacity-85 active:opacity-70"
+              :style="{ background: config.color, boxShadow: `0 3px 10px ${config.color}38` }"
+              @click="onClose"
+            >
+              {{ buttonText }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -95,134 +97,118 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, watch, ref, h } from 'vue'
 
-// Props
-const props = defineProps({
-  show: {
-    type: Boolean,
-    default: false
-  },
-  type: {
-    type: String,
-    default: 'info',
-    validator: (value) => ['success', 'error', 'info', 'warning'].includes(value)
-  },
-  title: {
-    type: String,
-    default: '訊息通知'
-  },
-  message: {
-    type: String,
-    default: ''
-  },
-  buttonText: {
-    type: String,
-    default: '確定'
-  },
-  autoClose: {
-    type: Boolean,
-    default: true
-  },
-  duration: {
-    type: Number,
-    default: 5000
-  }
-})
-
-// Emits
-const emit = defineEmits(['close'])
-
-// Computed
-const typeClasses = computed(() => {
-  switch (props.type) {
-    case 'success':
-      return 'border-l-4 border-b-4 border-[#49897D]'
-    case 'error':
-      return 'border-l-4 border-b-4 border-[#F4C6C7]'
-    case 'info':
-      return 'border-l-4 border-b-4 border-[#5BA9D9]'
-    case 'warning':
-      return 'border-l-4 border-b-4 border-[#FFA340]'
-    default:
-      return ''
-  }
-})
-
-const iconBgClass = computed(() => {
-  switch (props.type) {
-    case 'success':
-      return 'bg-green-100'
-    case 'error':
-      return 'bg-red-100'
-    case 'info':
-      return 'bg-blue-100'
-    case 'warning':
-      return 'bg-yellow-100'
-    default:
-      return 'bg-gray-100'
-  }
-})
-
-const iconClass = computed(() => {
-  switch (props.type) {
-    case 'success':
-      return 'text-green-500'
-    case 'error':
-      return 'text-red-500'
-    case 'info':
-      return 'text-blue-500'
-    case 'warning':
-      return 'text-yellow-500'
-    default:
-      return 'text-gray-500'
-  }
-})
-
-const titleClass = computed(() => {
-  switch (props.type) {
-    case 'success':
-      return 'text-green-800'
-    case 'error':
-      return 'text-red-800'
-    case 'info':
-      return 'text-blue-800'
-    case 'warning':
-      return 'text-yellow-800'
-    default:
-      return 'text-gray-800'
-  }
-})
-
-const buttonClass = computed(() => {
-  switch (props.type) {
-    case 'success':
-      return 'bg-[#49897D] hover:bg-[#49897DCC]'
-    case 'error':
-      return 'bg-[#F23535] hover:bg-[#F23535CC]'
-    case 'info':
-      return 'bg-[#5BA9D9] hover:bg-[#5BA9D9CC]'
-    case 'warning':
-      return 'bg-[#FFA340] hover:bg-[#FFA340CC]'
-    default:
-      return 'bg-gray-600 hover:bg-gray-700'
-  }
-})
-
-// Methods
-const onClose = () => {
-  emit('close')
+// ── Icons (render function 版，避免 runtime template compile 問題) ──
+const svgProps = {
+  fill: 'none',
+  stroke: 'currentColor',
+  'stroke-width': '2.5',
+  'stroke-linecap': 'round',
+  'stroke-linejoin': 'round',
+  viewBox: '0 0 24 24',
 }
 
-// Auto close timer
+const drawPath = (d, delay = 0.1, duration = 0.5) =>
+  h('path', {
+    d,
+    pathLength: 1,
+    'stroke-dasharray': 1,
+    'stroke-dashoffset': 1,
+    style: {
+      animation: `ml-icon-draw ${duration}s ease ${delay}s forwards`,
+    },
+  })
+
+const CheckIcon = {
+  render: () => h('svg', svgProps, [drawPath('M5 13l4 4L19 7', 0.1, 0.4)]),
+}
+const XIcon = {
+  render: () => h('svg', svgProps, [
+    drawPath('M6 18L18 6', 0.1, 0.25),
+    drawPath('M6 6l12 12', 0.3, 0.25),
+  ]),
+}
+const InfoIcon = {
+  render: () => h('svg', svgProps, [
+    drawPath('M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 0.05, 0.5),
+    drawPath('M12 8v4', 0.45, 0.2),
+    drawPath('M12 16h.01', 0.6, 0.15),
+  ]),
+}
+const WarnIcon = {
+  render: () => h('svg', svgProps, [
+    drawPath('M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z', 0.05, 0.5),
+    drawPath('M12 9v4', 0.45, 0.2),
+    drawPath('M12 17h.01', 0.6, 0.15),
+  ]),
+}
+
+// ── Props ──────────────────────────────────────────────
+const props = defineProps({
+  show:       { type: Boolean, default: false },
+  type:       {
+    type: String, default: 'info',
+    validator: (v) => ['success', 'error', 'info', 'warning'].includes(v)
+  },
+  title:      { type: String, default: '訊息通知' },
+  message:    { type: String, default: '' },
+  buttonText: { type: String, default: '確定' },
+  autoClose:  { type: Boolean, default: true },
+  duration:   { type: Number,  default: 5000 },
+})
+
+const emit = defineEmits(['close'])
+
+// ── Config map ─────────────────────────────────────────
+const TYPE_CONFIG = {
+  success: { color: '#2E7A65', colorL: '#E6F4F0', icon: CheckIcon },
+  error:   { color: '#C43C28', colorL: '#FDECEA', icon: XIcon     },
+  info:    { color: '#E8911C', colorL: '#FEF4E6', icon: InfoIcon  },
+  warning: { color: '#B87010', colorL: '#FFF5DC', icon: WarnIcon  },
+}
+
+const config      = computed(() => TYPE_CONFIG[props.type] ?? TYPE_CONFIG.info)
+const currentIcon = computed(() => config.value.icon)
+
+const cardStyle = computed(() => ({
+  boxShadow: '0 16px 48px rgba(38,30,10,0.16), 0 0 0 1px rgba(38,30,10,0.06)',
+  border: `1.5px solid ${config.value.colorL}`,
+}))
+
+const iconStyle = computed(() => ({
+  width: '42px', height: '42px',
+  background: config.value.color,
+  boxShadow: `0 3px 10px ${config.value.color}38`,
+}))
+
+// ── Auto-close ─────────────────────────────────────────
+const progressKey = ref(0)
 let timer = null
 
-watch(() => props.show, (newVal) => {
-  if (newVal && props.autoClose) {
+const onClose = () => emit('close')
+
+watch(() => props.show, (val) => {
+  if (val) {
+    progressKey.value++
+    if (props.autoClose) {
+      clearTimeout(timer)
+      timer = setTimeout(onClose, props.duration)
+    }
+  } else {
     clearTimeout(timer)
-    timer = setTimeout(() => {
-      emit('close')
-    }, props.duration)
   }
 })
-</script> 
+</script>
+
+<style>
+/* 全域 keyframes — scoped 內的 keyframe 名稱不受影響，但 inline style 無法參照 scoped hash */
+@keyframes ml-progress-shrink {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+@keyframes ml-icon-draw {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+</style>

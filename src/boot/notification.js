@@ -22,7 +22,7 @@ const notification = {
       message: '',
       buttonText: '確定',
       autoClose: true,
-      duration: 30000,
+      duration: 3000,
       ...options
     })
   },

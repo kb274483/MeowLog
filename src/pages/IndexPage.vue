@@ -164,20 +164,62 @@
     />
 
     <q-dialog v-model="showSettingsDialog" persistent>
-      <q-card class="ml-dialog">
+      <q-card class="ml-dialog ml-dialog--scrollable">
         <q-card-section class="dialog-header">
           <div class="text-h6">家庭設定</div>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
-        <q-card-section>
+        <q-card-section class="dialog-body">
           <div class="settings-section-label">熱量計算設定</div>
-          <q-input v-model.number="familySettings.wetFoodCalories"
-            label="濕食熱量 (kcal / 盒或罐)" type="number" dense outlined class="mb-3" />
-          <q-input v-model.number="familySettings.dryFoodCalories"
-            label="乾食熱量 (kcal / g)" type="number" dense outlined step="0.1" />
+
+          <!-- Single pet (or 0 pet): simple form, writes to family.* -->
+          <template v-if="petStore.pets.length <= 1">
+            <q-input v-model.number="familySettings.wetFoodCalories"
+              label="濕食熱量 (kcal / 盒或罐)" type="number" dense outlined class="mb-3" />
+            <q-input v-model.number="familySettings.dryFoodCalories"
+              label="乾食熱量 (kcal / g)" type="number" dense outlined step="0.1" />
+          </template>
+
+          <!-- Multi pet: default group + extra groups -->
+          <template v-else>
+            <!-- 預設組 (family.*) -->
+            <div class="cal-group cal-group--default">
+              <div class="cal-group__head">
+                <span class="cal-group__title">預設設定</span>
+                <span class="cal-group__badge">未綁定寵物將沿用</span>
+              </div>
+              <q-input v-model.number="familySettings.wetFoodCalories"
+                label="濕食熱量 (kcal / 盒或罐)" type="number" dense outlined class="mb-2" />
+              <q-input v-model.number="familySettings.dryFoodCalories"
+                label="乾食熱量 (kcal / g)" type="number" dense outlined step="0.1" class="mb-2" />
+              <div class="cal-group__pets">
+                套用對象：{{ unboundPetNames.length ? unboundPetNames.join('、') : '（無，所有寵物皆已個別設定）' }}
+              </div>
+            </div>
+
+            <div class="cal-extra-divider">額外設定</div>
+
+            <div v-for="(group, idx) in calorieGroups" :key="group.localId" class="cal-group">
+              <div class="cal-group__head">
+                <span class="cal-group__title">額外設定 #{{ idx + 1 }}</span>
+                <button type="button" class="cal-group__remove" @click="removeGroup(idx)">刪除</button>
+              </div>
+              <q-input v-model.number="group.wetFoodCalories"
+                label="濕食熱量 (kcal / 盒或罐)" type="number" dense outlined class="mb-2" />
+              <q-input v-model.number="group.dryFoodCalories"
+                label="乾食熱量 (kcal / g)" type="number" dense outlined step="0.1" class="mb-2" />
+              <q-select v-model="group.petIds" multiple emit-value map-options
+                :options="availablePetOptions(idx)"
+                label="綁定寵物" dense outlined use-chips />
+            </div>
+
+            <button type="button" class="cal-group__add" @click="addGroup">
+              + 新增額外設定
+            </button>
+          </template>
         </q-card-section>
-        <q-card-actions align="right">
+        <q-card-actions align="right" class="dialog-actions">
           <q-btn flat label="取消" color="grey" v-close-popup />
           <q-btn label="儲存" color="primary" :loading="isSavingSettings" @click="saveSettings" />
         </q-card-actions>
@@ -187,7 +229,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive, watch } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { auth, provider, signInWithPopup } from 'src/boot/firebase'
 import { useUserStore } from 'src/stores/userStore'
 import { usePetStore } from 'src/stores/petStore'
@@ -218,6 +260,58 @@ const isLeavingFamily = ref(false)
 const showSettingsDialog = ref(false)
 const isSavingSettings = ref(false)
 const familySettings = reactive({ wetFoodCalories: null, dryFoodCalories: null })
+const calorieGroups = ref([])
+let _groupLocalId = 0
+const nextLocalId = () => ++_groupLocalId
+
+const buildGroupsFromPets = () => {
+  const map = new Map()
+  for (const pet of petStore.pets) {
+    const fc = pet.foodCalories
+    if (!fc || (fc.wet == null && fc.dry == null)) continue
+    const sig = `${fc.wet ?? ''}|${fc.dry ?? ''}`
+    if (!map.has(sig)) {
+      map.set(sig, {
+        localId: nextLocalId(),
+        wetFoodCalories: fc.wet ?? null,
+        dryFoodCalories: fc.dry ?? null,
+        petIds: [],
+      })
+    }
+    map.get(sig).petIds.push(pet.id)
+  }
+  return Array.from(map.values())
+}
+
+const availablePetOptions = (currentIdx) => {
+  const takenElsewhere = new Set()
+  calorieGroups.value.forEach((g, i) => {
+    if (i === currentIdx) return
+    g.petIds.forEach((id) => takenElsewhere.add(id))
+  })
+  return petStore.pets
+    .filter((p) => !takenElsewhere.has(p.id))
+    .map((p) => ({ label: p.name, value: p.id }))
+}
+
+const unboundPetNames = computed(() => {
+  const bound = new Set()
+  calorieGroups.value.forEach((g) => g.petIds.forEach((id) => bound.add(id)))
+  return petStore.pets.filter((p) => !bound.has(p.id)).map((p) => p.name)
+})
+
+const addGroup = () => {
+  calorieGroups.value.push({
+    localId: nextLocalId(),
+    wetFoodCalories: null,
+    dryFoodCalories: null,
+    petIds: [],
+  })
+}
+
+const removeGroup = (idx) => {
+  calorieGroups.value.splice(idx, 1)
+}
 
 watch(() => userStore.hasFamily, (hasFamily) => {
   if (hasFamily && userStore.isLoggedIn) void petStore.fetchFamilyPets()
@@ -380,9 +474,23 @@ const leaveFamily = async () => {
 }
 
 const openSettings = () => {
-  if (userStore.family) {
-    familySettings.wetFoodCalories = userStore.family.wetFoodCalories || null
-    familySettings.dryFoodCalories = userStore.family.dryFoodCalories || null
+  if (!userStore.family) {
+    showSettingsDialog.value = true
+    return
+  }
+  if (petStore.pets.length <= 1) {
+    // Single pet: prefer pet-level value if present, else family.*
+    const onlyPet = petStore.pets[0]
+    const petFc = onlyPet?.foodCalories
+    familySettings.wetFoodCalories =
+      petFc?.wet ?? userStore.family.wetFoodCalories ?? null
+    familySettings.dryFoodCalories =
+      petFc?.dry ?? userStore.family.dryFoodCalories ?? null
+  } else {
+    // Multi-pet: load family.* into default group + build extra groups from pets
+    familySettings.wetFoodCalories = userStore.family.wetFoodCalories ?? null
+    familySettings.dryFoodCalories = userStore.family.dryFoodCalories ?? null
+    calorieGroups.value = buildGroupsFromPets()
   }
   showSettingsDialog.value = true
 }
@@ -390,16 +498,54 @@ const openSettings = () => {
 const saveSettings = async () => {
   isSavingSettings.value = true
   try {
-    const success = await userStore.updateFamilySettings({
-      wetFoodCalories: familySettings.wetFoodCalories,
-      dryFoodCalories: familySettings.dryFoodCalories
-    })
-    if (success) {
-      notification.success('家庭設定已更新')
-      showSettingsDialog.value = false
-    } else throw new Error('更新失敗')
+    if (petStore.pets.length <= 1) {
+      // Single-pet path: write to family.*, clear pet-level overrides
+      const ok = await userStore.updateFamilySettings({
+        wetFoodCalories: familySettings.wetFoodCalories,
+        dryFoodCalories: familySettings.dryFoodCalories,
+      })
+      if (!ok) throw new Error('更新失敗')
+      const onlyPet = petStore.pets[0]
+      if (onlyPet?.foodCalories) {
+        await petStore.updatePet(onlyPet.id, { foodCalories: null })
+      }
+    } else {
+      // Multi-pet path: default group → family.*, extra groups → pet.foodCalories
+      const emptyGroupIdx = calorieGroups.value.findIndex((g) => g.petIds.length === 0)
+      if (emptyGroupIdx !== -1) {
+        notification.error(`額外設定 #${emptyGroupIdx + 1} 尚未綁定任何寵物，請綁定或刪除該設定`)
+        isSavingSettings.value = false
+        return
+      }
+      const familyOk = await userStore.updateFamilySettings({
+        wetFoodCalories: familySettings.wetFoodCalories,
+        dryFoodCalories: familySettings.dryFoodCalories,
+      })
+      if (!familyOk) throw new Error('預設設定更新失敗')
+      const updates = []
+      for (const pet of petStore.pets) {
+        const group = calorieGroups.value.find((g) => g.petIds.includes(pet.id))
+        const next = group
+          ? {
+              wet: group.wetFoodCalories ?? null,
+              dry: group.dryFoodCalories ?? null,
+            }
+          : null
+        const prev = pet.foodCalories ?? null
+        const changed =
+          (prev?.wet ?? null) !== (next?.wet ?? null) ||
+          (prev?.dry ?? null) !== (next?.dry ?? null)
+        if (changed) {
+          updates.push(petStore.updatePet(pet.id, { foodCalories: next }))
+        }
+      }
+      const results = await Promise.all(updates)
+      if (results.some((r) => r === false)) throw new Error('部分寵物更新失敗')
+    }
+    notification.success('熱量設定已更新')
+    showSettingsDialog.value = false
   } catch (err) {
-    notification.error(err,'更新設定失敗，請重試')
+    notification.error(err?.message || '更新設定失敗，請重試')
   } finally {
     isSavingSettings.value = false
   }
@@ -562,6 +708,25 @@ const saveSettings = async () => {
   max-width: 440px;
 }
 
+.ml-dialog--scrollable {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+.ml-dialog--scrollable .dialog-header,
+.ml-dialog--scrollable .dialog-actions {
+  flex-shrink: 0;
+}
+.ml-dialog--scrollable .dialog-body {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.dialog-actions {
+  border-top: 1px solid var(--ml-border);
+  padding: 12px 16px;
+}
+
 .dialog-header {
   display: flex;
   align-items: center;
@@ -576,5 +741,91 @@ const saveSettings = async () => {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 12px;
+}
+
+.cal-group {
+  border: 1px solid var(--ml-border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: var(--ml-surface);
+}
+.cal-group--default {
+  border-color: var(--ml-primary);
+  background: var(--ml-primary-l, rgba(236,138,32,0.06));
+}
+.cal-group__badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ml-primary);
+  background: rgba(236,138,32,0.15);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+.cal-group__pets {
+  font-size: 12px;
+  color: var(--ml-text-sec);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.cal-extra-divider {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ml-text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 16px 0 10px;
+}
+.cal-group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal-group__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ml-text);
+}
+.cal-group__remove {
+  background: transparent;
+  border: none;
+  color: #d33;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.cal-group__remove:hover { background: rgba(211,51,51,0.08); }
+.cal-group__add {
+  width: 100%;
+  background: transparent;
+  border: 1.5px dashed var(--ml-border);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ml-text-sec);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cal-group__add:hover {
+  background: var(--ml-bg);
+  border-color: var(--ml-primary);
+  color: var(--ml-primary);
+}
+.cal-unbound-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ml-text-sec);
+  background: var(--ml-primary-l, rgba(236,138,32,0.08));
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  line-height: 1.4;
 }
 </style>

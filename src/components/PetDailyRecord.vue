@@ -207,6 +207,7 @@ import {
 } from 'src/boot/firebase';
 import { notification } from 'src/boot/notification';
 import { useUserStore } from 'src/stores/userStore';
+import { usePetStore } from 'src/stores/petStore';
 import MediaUploader from 'src/components/MediaUploader.vue';
 import { uploadMediaFiles, getCleanMediaFiles } from 'src/services/mediaUploadService';
 import { cacheGet, cacheSet } from 'src/utils/idbCache';
@@ -219,7 +220,17 @@ const props = defineProps({
 const emit = defineEmits(['saved']);
 
 const userStore    = useUserStore();
+const petStore     = usePetStore();
 const router       = useRouter();
+
+// ── Calorie params: pet.foodCalories overrides family.* ──
+const currentPet = computed(() => petStore.pets.find((p) => p.id === props.petId) || null);
+const wetCalPerUnit = computed(() =>
+  currentPet.value?.foodCalories?.wet ?? userStore.family?.wetFoodCalories ?? null
+);
+const dryCalPerUnit = computed(() =>
+  currentPet.value?.foodCalories?.dry ?? userStore.family?.dryFoodCalories ?? null
+);
 const isUploading  = ref(false);
 const isSaving     = ref(false);
 const uploadProgress = ref(0);
@@ -287,8 +298,8 @@ const isWetFoodPresetActive = (presetValue) => Math.abs((formData.wetFoodAmount 
 // ── Calories ──
 const caloriesFromInputs = computed(() => {
   if (!userStore.family) return 0;
-  const wetCals = (formData.wetFoodAmount || 0) * (userStore.family.wetFoodCalories || 0);
-  const dryCals = (formData.foodAmount    || 0) * (userStore.family.dryFoodCalories || 0);
+  const wetCals = (formData.wetFoodAmount || 0) * (wetCalPerUnit.value || 0);
+  const dryCals = (formData.foodAmount    || 0) * (dryCalPerUnit.value || 0);
   return Math.round(wetCals + dryCals);
 });
 
@@ -305,10 +316,9 @@ const calculatedCalories = computed(() =>
 );
 
 const needsCalorieSettings = computed(() => {
-  const family = userStore.family;
-  if (!family) return false;
-  const wetMissing = !family.wetFoodCalories;
-  const dryMissing = !family.dryFoodCalories;
+  if (!userStore.family) return false;
+  const wetMissing = !wetCalPerUnit.value;
+  const dryMissing = !dryCalPerUnit.value;
   const hasWetInput = (formData.wetFoodAmount || 0) > 0;
   const hasDryInput = (formData.foodAmount || 0) > 0;
   return (hasWetInput && wetMissing) || (hasDryInput && dryMissing);

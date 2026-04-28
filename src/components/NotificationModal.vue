@@ -61,25 +61,8 @@
           <!-- Divider -->
           <div class="h-px bg-[#EDE5D8] my-3" />
 
-          <!-- Footer: progress bar + button -->
-          <div class="flex items-center gap-3">
-
-            <!-- Auto-close progress bar -->
-            <div
-              v-if="autoClose"
-              class="flex-1 h-1 rounded-full overflow-hidden"
-              :style="{ background: config.colorL }"
-            >
-              <div
-                :key="progressKey"
-                class="h-full rounded-full origin-left"
-                :style="{
-                  background: config.color,
-                  animation: `ml-progress-shrink ${duration}ms linear forwards`,
-                }"
-              />
-            </div>
-
+          <!-- Footer: button -->
+          <div class="flex items-center justify-end">
             <!-- Confirm button -->
             <button
               class="flex-shrink-0 px-[18px] py-[7px] rounded-[10px] font-bold text-[13px]
@@ -97,7 +80,7 @@
 </template>
 
 <script setup>
-import { computed, watch, ref, h } from 'vue'
+import { computed, watch, h } from 'vue'
 
 // ── Icons (render function 版，避免 runtime template compile 問題) ──
 const svgProps = {
@@ -183,14 +166,12 @@ const iconStyle = computed(() => ({
 }))
 
 // ── Auto-close ─────────────────────────────────────────
-const progressKey = ref(0)
 let timer = null
 
 const onClose = () => emit('close')
 
 watch(() => props.show, (val) => {
   if (val) {
-    progressKey.value++
     if (props.autoClose) {
       clearTimeout(timer)
       timer = setTimeout(onClose, props.duration)
@@ -203,10 +184,6 @@ watch(() => props.show, (val) => {
 
 <style>
 /* 全域 keyframes — scoped 內的 keyframe 名稱不受影響，但 inline style 無法參照 scoped hash */
-@keyframes ml-progress-shrink {
-  from { transform: scaleX(1); }
-  to   { transform: scaleX(0); }
-}
 @keyframes ml-icon-draw {
   from { stroke-dashoffset: 1; }
   to   { stroke-dashoffset: 0; }

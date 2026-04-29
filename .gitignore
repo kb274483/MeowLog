@@ -35,7 +35,6 @@ yarn-error.log*
 .env
 
 /cors.json
-/firebase.json
 /firestore.rules
 /firebase-debug.log*
 .firebaserc

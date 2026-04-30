@@ -10,7 +10,11 @@
     <!-- Type badge + title row -->
     <div class="reminder-item__top">
       <span class="type-badge" :class="`type-badge--${reminder.type}`">
-        {{ typeConfig[reminder.type]?.icon }}
+        <q-icon
+          v-if="typeConfig[reminder.type]?.icon"
+          :name="typeConfig[reminder.type].icon"
+          class="type-badge__icon"
+        />
         {{ typeConfig[reminder.type]?.label }}
       </span>
       <span v-if="isCompleted" class="status-chip status-chip--done">已完成</span>
@@ -61,12 +65,12 @@ const props = defineProps({
 defineEmits(['edit', 'complete', 'toggle', 'delete'])
 
 const typeConfig = {
-  vet:      { label: '看診', icon: '🏥' },
-  deworm:   { label: '驅蟲', icon: '🐛' },
-  vaccine:  { label: '疫苗', icon: '💉' },
-  bath:     { label: '洗澡', icon: '🛁' },
-  grooming: { label: '美容', icon: '✂️' },
-  other:    { label: '提醒', icon: '📌' },
+  vet:      { label: '看診', icon: 'medical_services' },
+  deworm:   { label: '驅蟲', icon: 'pest_control' },
+  vaccine:  { label: '疫苗', icon: 'vaccines' },
+  bath:     { label: '洗澡', icon: 'bathtub' },
+  grooming: { label: '美容', icon: 'content_cut' },
+  other:    { label: '提醒', icon: 'event_note' },
 }
 
 const isCompleted = computed(() => !!props.reminder.completedAt)
@@ -128,9 +132,13 @@ const formattedDate = computed(() => {
   font-size: 11.5px;
   font-weight: 600;
 }
-.type-badge--vet     { background: var(--ml-blue-bg);   color: var(--ml-blue); }
-.type-badge--deworm  { background: var(--ml-green-bg);  color: var(--ml-green); }
-.type-badge--vaccine { background: var(--ml-amber-bg);  color: var(--ml-amber); }
+.type-badge__icon    { font-size: 13px; }
+.type-badge--vet      { background: var(--ml-blue-bg);   color: var(--ml-blue); }
+.type-badge--deworm   { background: var(--ml-green-bg);  color: var(--ml-green); }
+.type-badge--vaccine  { background: var(--ml-amber-bg);  color: var(--ml-amber); }
+.type-badge--bath     { background: var(--ml-primary-l); color: var(--ml-primary); }
+.type-badge--grooming { background: var(--ml-bg);        color: var(--ml-text-sec); border: 1px solid var(--ml-border); }
+.type-badge--other    { background: var(--ml-bg);        color: var(--ml-text-muted); border: 1px solid var(--ml-border); }
 
 /* Status chips */
 .status-chip {

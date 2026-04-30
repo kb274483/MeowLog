@@ -79,7 +79,14 @@ async function sendReminderNotification(db, reminder, offset, scheduledDate) {
   }
 
   // Build notification payload
-  const typeLabel = TYPE_LABELS[reminder.type] || '提醒'
+  // For type='other' (free-form), prefer the user's note as the label
+  // so notifications show meaningful content instead of the literal「其他」.
+  let typeLabel = TYPE_LABELS[reminder.type] || '提醒'
+  if (reminder.type === 'other') {
+    const trimmedNote = (reminder.note || '').trim()
+    typeLabel = trimmedNote || '其他'
+  }
+
   const notifTitle = offset === -1 ? `明天「${typeLabel}」提醒` : `今天「${typeLabel}」提醒`
   const notifBody = reminder.title || `${typeLabel}時間到了`
   // Include reminder dueDate so the page lands on the day of the event,

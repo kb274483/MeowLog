@@ -120,7 +120,9 @@ self.addEventListener('push', (event) => {
 
   const notif = payload.notification || {}
   const data = payload.data || {}
-  const link = payload.fcmOptions?.link || data.url || data.link || '/'
+  // Prefer `data.path` so the deep-link resolves against THIS PWA's origin
+  // (works for preview channels). fcmOptions.link is kept as fallback.
+  const link = data.path || payload.fcmOptions?.link || data.url || data.link || '/'
 
   const title = notif.title || payload.title || 'Meow Log'
   const options = {

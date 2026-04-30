@@ -1,15 +1,15 @@
-'use strict';
+'use strict'
 
-const { logger } = require('firebase-functions');
-const { FieldValue } = require('firebase-admin/firestore');
-const { getMessaging } = require('firebase-admin/messaging');
+const { logger } = require('firebase-functions')
+const { FieldValue } = require('firebase-admin/firestore')
+const { getMessaging } = require('firebase-admin/messaging')
 
-const TYPE_LABELS = { vet: '看診', deworm: '驅蟲', vaccine: '疫苗' };
+const TYPE_LABELS = { vet: '看診', deworm: '驅蟲', vaccine: '疫苗' }
 
 // Set APP_DOMAIN in Firebase Functions environment:
 //   firebase functions:secrets:set APP_DOMAIN
 // or via .env.local for emulator.
-const APP_DOMAIN = process.env.APP_DOMAIN || 'https://meow-log.web.app';
+const APP_DOMAIN = process.env.APP_DOMAIN || 'https://meow-log.web.app'
 
 /**
  * Send push notifications for one reminder + offset pair.
@@ -24,8 +24,8 @@ const APP_DOMAIN = process.env.APP_DOMAIN || 'https://meow-log.web.app';
  * @returns {Promise<{ failedTokens: string[] }>}
  */
 async function sendReminderNotification(db, reminder, offset, scheduledDate) {
-  const logId = `${reminder.id}_${offset}_${scheduledDate}`;
-  const logRef = db.doc(`notificationLogs/${logId}`);
+  const logId = `${reminder.id}_${offset}_${scheduledDate}`
+  const logRef = db.doc(`notificationLogs/${logId}`)
 
   // Atomic lock: DocumentReference.create() throws ALREADY_EXISTS if the log
   // was already written, preventing duplicate sends on function retries or overlaps.
@@ -38,18 +38,16 @@ async function sendReminderNotification(db, reminder, offset, scheduledDate) {
       scheduledDate,
       pending: true,
       createdAt: FieldValue.serverTimestamp(),
-    });
+    })
   } catch (err) {
     const isAlreadyExists =
-      err.code === 6 ||
-      err.code === 'already-exists' ||
-      err.message?.includes('ALREADY_EXISTS');
+      err.code === 6 || err.code === 'already-exists' || err.message?.includes('ALREADY_EXISTS')
 
     if (isAlreadyExists) {
-      logger.info('sendReminderNotification: duplicate skipped', { logId });
-      return { failedTokens: [] };
+      logger.info('sendReminderNotification: duplicate skipped', { logId })
+      return { failedTokens: [] }
     }
-    throw err;
+    throw err
   }
 
   // Load all enabled push tokens for this family
@@ -57,36 +55,34 @@ async function sendReminderNotification(db, reminder, offset, scheduledDate) {
     .collection('pushTokens')
     .where('familyId', '==', reminder.familyId)
     .where('enabled', '==', true)
-    .get();
+    .get()
 
-  const tokens = tokensSnap.docs.map((d) => d.data().token).filter(Boolean);
+  const tokens = tokensSnap.docs.map((d) => d.data().token).filter(Boolean)
 
   if (tokens.length === 0) {
-    logger.info('sendReminderNotification: no enabled tokens', { familyId: reminder.familyId });
+    logger.info('sendReminderNotification: no enabled tokens', { familyId: reminder.familyId })
     await logRef.update({
       pending: false,
       tokenCount: 0,
       successCount: 0,
       failureCount: 0,
       sentAt: FieldValue.serverTimestamp(),
-    });
-    return { failedTokens: [] };
+    })
+    return { failedTokens: [] }
   }
 
   // Build notification payload
-  const typeLabel = TYPE_LABELS[reminder.type] || '提醒';
-  const notifTitle = offset === -1
-    ? `明天「${typeLabel}」提醒`
-    : `今天「${typeLabel}」提醒`;
-  const notifBody = reminder.title || `${typeLabel}時間到了`;
-  const petUrl = reminder.petId
-    ? `${APP_DOMAIN}/pet/${reminder.petId}`
-    : APP_DOMAIN;
+  const typeLabel = TYPE_LABELS[reminder.type] || '提醒'
+  const notifTitle = offset === -1 ? `明天「${typeLabel}」提醒` : `今天「${typeLabel}」提醒`
+  const notifBody = reminder.title || `${typeLabel}時間到了`
+  const petPath = reminder.petId ? `/pet/${reminder.petId}` : '/'
+  const petUrl = `${APP_DOMAIN}${petPath}`
 
   const message = {
     tokens,
     notification: { title: notifTitle, body: notifBody },
     webpush: {
+      // fcmOptions.link is the FCM-default fallback (used when no custom SW is set)
       fcmOptions: { link: petUrl },
       notification: {
         icon: '/icons/icon-192x192.png',
@@ -99,37 +95,40 @@ async function sendReminderNotification(db, reminder, offset, scheduledDate) {
       reminderId: reminder.id,
       petId: reminder.petId || '',
       type: reminder.type || '',
+      // path is what our custom SW prefers — it resolves against the PWA's
+      // own origin so notifications opened in preview/staging land in the same env.
+      path: petPath,
     },
-  };
+  }
 
-  let successCount = 0;
-  let failureCount = 0;
-  const failedTokens = [];
+  let successCount = 0
+  let failureCount = 0
+  const failedTokens = []
 
   try {
-    const response = await getMessaging().sendEachForMulticast(message);
-    successCount = response.successCount;
-    failureCount = response.failureCount;
+    const response = await getMessaging().sendEachForMulticast(message)
+    successCount = response.successCount
+    failureCount = response.failureCount
 
     response.responses.forEach((resp, i) => {
-      if (resp.success) return;
-      const errCode = resp.error?.code || '';
+      if (resp.success) return
+      const errCode = resp.error?.code || ''
       logger.warn('sendReminderNotification: FCM token failed', {
         tokenSuffix: tokens[i].slice(-8),
         errCode,
-      });
+      })
       // Collect tokens that are permanently invalid for cleanup
       if (
         errCode.includes('invalid-registration-token') ||
         errCode.includes('registration-token-not-registered') ||
         errCode.includes('invalid-argument')
       ) {
-        failedTokens.push(tokens[i]);
+        failedTokens.push(tokens[i])
       }
-    });
+    })
   } catch (err) {
-    logger.error('sendReminderNotification: FCM multicast error', err);
-    failureCount = tokens.length;
+    logger.error('sendReminderNotification: FCM multicast error', err)
+    failureCount = tokens.length
   }
 
   await logRef.update({
@@ -138,10 +137,10 @@ async function sendReminderNotification(db, reminder, offset, scheduledDate) {
     successCount,
     failureCount,
     sentAt: FieldValue.serverTimestamp(),
-  });
+  })
 
-  logger.info('sendReminderNotification: done', { logId, successCount, failureCount });
-  return { failedTokens };
+  logger.info('sendReminderNotification: done', { logId, successCount, failureCount })
+  return { failedTokens }
 }
 
-module.exports = { sendReminderNotification };
+module.exports = { sendReminderNotification }

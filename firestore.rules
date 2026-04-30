@@ -64,6 +64,35 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // 寵物：限同家庭成員讀寫
+    match /pets/{petId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if request.auth != null && isFamilyMember(request.resource.data.familyId);
+      allow update, delete: if isFamilyMember(resource.data.familyId);
+    }
+
+    // 寵物每日記錄：限同家庭成員讀寫
+    match /petDailyRecords/{recordId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if request.auth != null && isFamilyMember(request.resource.data.familyId);
+      allow update, delete: if isFamilyMember(resource.data.familyId);
+    }
+
+    // 寵物檔案：限同家庭成員讀寫
+    match /petFiles/{fileId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if request.auth != null && isFamilyMember(request.resource.data.familyId);
+      allow update, delete: if isFamilyMember(resource.data.familyId);
+    }
+
+    // 碗重記錄（含子集合 entries）：登入即可讀寫
+    match /bowlLogs/{date} {
+      allow read, write: if request.auth != null;
+      match /entries/{entryId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
     // 家庭成员集合
     match /familyMembers/{docId} {
       // 用户可以创建自己作为成员的记录

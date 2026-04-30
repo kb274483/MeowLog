@@ -25,6 +25,12 @@ import {
   getDownloadURL,
   deleteObject,
 } from 'firebase/storage'
+import {
+  getMessaging,
+  getToken,
+  onMessage,
+  isSupported as isMessagingSupported,
+} from 'firebase/messaging'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
@@ -41,6 +47,22 @@ const auth = getAuth(app)
 const provider = new GoogleAuthProvider()
 const db = getFirestore(app)
 const storage = getStorage(app)
+
+const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY
+
+let _messaging = null
+const getMessagingIfSupported = async () => {
+  if (_messaging) return _messaging
+  try {
+    const supported = await isMessagingSupported()
+    if (!supported) return null
+    _messaging = getMessaging(app)
+    return _messaging
+  } catch (err) {
+    console.error('Messaging init failed', err)
+    return null
+  }
+}
 
 // import { setLogLevel } from 'firebase/firestore';
 // setLogLevel('debug');
@@ -70,4 +92,8 @@ export {
   uploadBytesResumable,
   getDownloadURL,
   deleteObject,
+  getMessagingIfSupported,
+  getToken,
+  onMessage,
+  VAPID_KEY,
 }

@@ -14,11 +14,13 @@
     </q-page-container>
 
     <install-prompt />
+    <notification-opt-in-dialog />
   </q-layout>
 </template>
 
 <script setup>
 import InstallPrompt from 'src/components/InstallPrompt.vue';
+import NotificationOptInDialog from 'src/components/notifications/NotificationOptInDialog.vue';
 </script>
 
 <style>

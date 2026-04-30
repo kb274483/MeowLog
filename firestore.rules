@@ -1,0 +1,85 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 基本权限：登录用户可以读写自己的数据
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 家庭集合
+    match /families/{familyId} {
+      // 任何人都可以创建家庭
+      allow create: if request.auth != null;
+      
+      // 只有家庭成员可以读取家庭信息
+      allow read: if request.auth != null && 
+                   exists(/databases/$(database)/documents/familyMembers/$(request.auth.uid + '_' + familyId));
+      
+      // 只有家庭管理员可以更新或删除家庭
+      allow update, delete: if request.auth != null && 
+                             exists(/databases/$(database)/documents/familyMembers/$(request.auth.uid + '_' + familyId)) &&
+                             get(/databases/$(database)/documents/familyMembers/$(request.auth.uid + '_' + familyId)).data.role == 'admin';
+    }
+    
+    // 家庭成員資格 helper
+    function isFamilyMember(familyId) {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/familyMembers/$(request.auth.uid + '_' + familyId));
+    }
+
+    // 提醒事項：限同家庭成員讀寫
+    match /reminders/{reminderId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+
+      allow create: if request.auth != null &&
+                    isFamilyMember(request.resource.data.familyId) &&
+                    request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if isFamilyMember(resource.data.familyId) &&
+                    request.resource.data.familyId == resource.data.familyId;
+
+      allow delete: if isFamilyMember(resource.data.familyId);
+    }
+
+    // Push Token：僅本人可讀寫自己的 token；docId 格式為 {userId}_{tokenHash}
+    match /pushTokens/{tokenId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      allow create: if request.auth != null &&
+                    request.resource.data.userId == request.auth.uid &&
+                    isFamilyMember(request.resource.data.familyId) &&
+                    tokenId.matches(request.auth.uid + '_.*');
+
+      allow update: if request.auth != null &&
+                    resource.data.userId == request.auth.uid &&
+                    request.resource.data.userId == request.auth.uid;
+
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // 通知 log：只允許 server (Admin SDK) 寫入；同家庭成員可讀以便除錯
+    match /notificationLogs/{logId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow write: if false;
+    }
+
+    // 家庭成员集合
+    match /familyMembers/{docId} {
+      // 用户可以创建自己作为成员的记录
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      
+      // 用户可以读取与自己相关的家庭成员记录或者同家庭的其他成员记录
+      allow read: if request.auth != null && 
+                  (resource.data.userId == request.auth.uid || 
+                   exists(/databases/$(database)/documents/familyMembers/$(request.auth.uid + '_' + resource.data.familyId)));
+      
+      // 只有家庭管理员或自己可以更新或删除成员记录
+      allow update, delete: if request.auth != null && 
+                            (resource.data.userId == request.auth.uid || 
+                            (exists(/databases/$(database)/documents/familyMembers/$(request.auth.uid + '_' + resource.data.familyId)) && 
+                            get(/databases/$(database)/documents/familyMembers/$(request.auth.uid + '_' + resource.data.familyId)).data.role == 'admin'));
+    }
+  }
+} 

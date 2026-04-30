@@ -176,7 +176,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, reactive, watch, defineAsyncComponent } from 'vue';
+import { ref, computed, onMounted, onUnmounted, reactive, watch, nextTick, defineAsyncComponent } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { usePetStore } from 'src/stores/petStore';
 import { useUserStore } from 'src/stores/userStore';
@@ -439,8 +439,34 @@ const fetchPetDetails = async () => {
 
 let subHeaderObserver = null;
 
+// Parse `?date=YYYY-MM-DD` into a local Date (or null if invalid/absent).
+// Used when navigating from a reminder notification so the page lands on the
+// day of the event, not on today.
+const parseQueryDate = (raw) => {
+  if (!raw || typeof raw !== 'string') return null;
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
 onMounted(async () => {
   await fetchPetDetails();
+
+  const targetDate = parseQueryDate(route.query.date);
+  if (targetDate) {
+    const sameMonth =
+      currentMonth.value === targetDate.getMonth() &&
+      currentYear.value === targetDate.getFullYear();
+    if (!sameMonth) {
+      currentDate.value = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+      // wait for the currentDate watcher (which clears selection) to flush before selecting
+      await nextTick();
+    }
+    selectDate(targetDate.getDate());
+    return;
+  }
+
   const today = new Date();
   if (currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear()) selectDate(today.getDate());
   if (subHeaderRef.value) {

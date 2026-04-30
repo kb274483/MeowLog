@@ -75,7 +75,11 @@ async function sendReminderNotification(db, reminder, offset, scheduledDate) {
   const typeLabel = TYPE_LABELS[reminder.type] || '提醒'
   const notifTitle = offset === -1 ? `明天「${typeLabel}」提醒` : `今天「${typeLabel}」提醒`
   const notifBody = reminder.title || `${typeLabel}時間到了`
-  const petPath = reminder.petId ? `/pet/${reminder.petId}` : '/'
+  // Include reminder dueDate so the page lands on the day of the event,
+  // not today (matters most for the day-before reminder).
+  const petPath = reminder.petId
+    ? `/pet/${reminder.petId}?date=${encodeURIComponent(reminder.dueDate)}`
+    : '/'
   const petUrl = `${APP_DOMAIN}${petPath}`
 
   const message = {

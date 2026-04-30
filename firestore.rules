@@ -30,7 +30,8 @@ service cloud.firestore {
 
     // 提醒事項：限同家庭成員讀寫
     match /reminders/{reminderId} {
-      allow read: if isFamilyMember(resource.data.familyId);
+      allow read: if request.auth != null &&
+                  (resource == null || isFamilyMember(resource.data.familyId));
 
       allow create: if request.auth != null &&
                     isFamilyMember(request.resource.data.familyId) &&
@@ -66,21 +67,24 @@ service cloud.firestore {
 
     // 寵物：限同家庭成員讀寫
     match /pets/{petId} {
-      allow read: if isFamilyMember(resource.data.familyId);
+      allow read: if request.auth != null &&
+                  (resource == null || isFamilyMember(resource.data.familyId));
       allow create: if request.auth != null && isFamilyMember(request.resource.data.familyId);
       allow update, delete: if isFamilyMember(resource.data.familyId);
     }
 
-    // 寵物每日記錄：限同家庭成員讀寫
+    // 寵物每日記錄：限同家庭成員讀寫；允許讀不存在的 doc（getDoc 取空記錄）
     match /petDailyRecords/{recordId} {
-      allow read: if isFamilyMember(resource.data.familyId);
+      allow read: if request.auth != null &&
+                  (resource == null || isFamilyMember(resource.data.familyId));
       allow create: if request.auth != null && isFamilyMember(request.resource.data.familyId);
       allow update, delete: if isFamilyMember(resource.data.familyId);
     }
 
     // 寵物檔案：限同家庭成員讀寫
     match /petFiles/{fileId} {
-      allow read: if isFamilyMember(resource.data.familyId);
+      allow read: if request.auth != null &&
+                  (resource == null || isFamilyMember(resource.data.familyId));
       allow create: if request.auth != null && isFamilyMember(request.resource.data.familyId);
       allow update, delete: if isFamilyMember(resource.data.familyId);
     }

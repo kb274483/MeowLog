@@ -1,16 +1,12 @@
 <template>
   <div class="reminder-list mx-4 mb-4">
-
     <!-- Section header -->
     <div class="reminder-list__header">
       <div class="reminder-list__title">
-        <q-icon name="notifications_active" style="font-size: 18px; color: var(--ml-primary);" />
-        照護提醒
+        <q-icon name="notifications_active" style="font-size: 18px; color: var(--ml-primary)" />
+        即將到來的提醒
         <span v-if="activeCount > 0" class="reminder-count">{{ activeCount }}</span>
       </div>
-      <button class="add-btn" @click="openCreate" title="新增提醒">
-        <q-icon name="add" style="font-size: 18px;" />
-      </button>
     </div>
 
     <!-- Loading -->
@@ -24,7 +20,7 @@
         v-for="r in activeReminders"
         :key="r.id"
         :reminder="r"
-        @edit="openEdit"
+        :read-only="true"
         @complete="confirmComplete"
         @toggle="handleToggle"
         @delete="confirmDelete"
@@ -33,9 +29,8 @@
 
     <!-- Empty state -->
     <div v-else class="reminder-list__empty">
-      <q-icon name="event_available" style="font-size: 36px; color: var(--ml-text-muted);" />
-      <p>還沒有提醒</p>
-      <button class="add-link" @click="openCreate">新增第一個提醒</button>
+      <q-icon name="event_available" style="font-size: 32px; color: var(--ml-text-muted)" />
+      <p>標記回診、疫苗或驅蟲時可設置通知</p>
     </div>
 
     <!-- Completed section toggle -->
@@ -44,7 +39,7 @@
       class="completed-toggle"
       @click="showCompleted = !showCompleted"
     >
-      <q-icon :name="showCompleted ? 'expand_less' : 'expand_more'" style="font-size: 16px;" />
+      <q-icon :name="showCompleted ? 'expand_less' : 'expand_more'" style="font-size: 16px" />
       已完成（{{ completedReminders.length }}）
     </button>
 
@@ -53,21 +48,12 @@
         v-for="r in completedReminders"
         :key="r.id"
         :reminder="r"
-        @edit="openEdit"
+        :read-only="true"
         @complete="confirmComplete"
         @toggle="handleToggle"
         @delete="confirmDelete"
       />
     </div>
-
-    <!-- Form dialog -->
-    <reminder-form-dialog
-      v-model="showForm"
-      :pet-id="petId"
-      :pet-name="petName"
-      :reminder="editTarget"
-      @saved="onSaved"
-    />
 
     <!-- Delete confirm -->
     <confirm-dialog
@@ -81,7 +67,6 @@
       @confirm="executeDelete"
       @cancel="deleteTargetId = null"
     />
-
   </div>
 </template>
 
@@ -90,23 +75,20 @@ import { ref, computed, onMounted } from 'vue'
 import { useReminderStore } from 'src/stores/reminderStore'
 import { notification } from 'src/boot/notification'
 import ReminderItem from './ReminderItem.vue'
-import ReminderFormDialog from './ReminderFormDialog.vue'
 import ConfirmDialog from 'src/components/ConfirmDialog.vue'
 
 const props = defineProps({
-  petId:   { type: String, required: true },
+  petId: { type: String, required: true },
   petName: { type: String, default: '' },
 })
 
 const reminderStore = useReminderStore()
 const { loading } = reminderStore
 
-const showForm        = ref(false)
-const editTarget      = ref(null)
-const showCompleted   = ref(false)
+const showCompleted = ref(false)
 const showDeleteConfirm = ref(false)
-const deleteTargetId  = ref(null)
-const actionLoading   = ref(false)
+const deleteTargetId = ref(null)
+const actionLoading = ref(false)
 
 const petReminders = computed(() =>
   reminderStore.reminders.filter((r) => r.petId === props.petId),
@@ -125,20 +107,6 @@ const completedReminders = computed(() =>
 )
 
 const activeCount = computed(() => activeReminders.value.filter((r) => r.enabled).length)
-
-const openCreate = () => {
-  editTarget.value = null
-  showForm.value = true
-}
-
-const openEdit = (reminder) => {
-  editTarget.value = reminder
-  showForm.value = true
-}
-
-const onSaved = () => {
-  // store already updated; nothing extra needed
-}
 
 const confirmComplete = async (id) => {
   const ok = await reminderStore.markComplete(id)
@@ -218,22 +186,6 @@ onMounted(() => {
   text-align: center;
 }
 
-.add-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: var(--ml-primary-l);
-  border: none;
-  color: var(--ml-primary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
-  flex-shrink: 0;
-}
-.add-btn:hover { background: var(--ml-primary-bd); }
-
 .reminder-list__items {
   padding: 10px 12px;
   display: flex;
@@ -250,20 +202,14 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 28px 16px;
+  padding: 24px 16px;
   color: var(--ml-text-muted);
   font-size: 13px;
+  text-align: center;
 }
 
-.add-link {
-  background: none;
-  border: none;
-  color: var(--ml-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  text-decoration: underline;
+.reminder-list__empty p {
+  margin: 0;
 }
 
 .completed-toggle {
@@ -282,5 +228,7 @@ onMounted(() => {
   font-family: inherit;
   transition: background 0.12s;
 }
-.completed-toggle:hover { background: var(--ml-primary-l); }
+.completed-toggle:hover {
+  background: var(--ml-primary-l);
+}
 </style>

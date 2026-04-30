@@ -196,6 +196,14 @@
         @file-change="handleFileChange"
       />
     </div>
+
+    <!-- ── Notification confirm dialog ── -->
+    <notification-confirm-dialog
+      v-model="showNotifConfirm"
+      :candidates="notifCandidates"
+      :due-date="notifDueDate"
+      @confirm="handleConfirmNotification"
+    />
   </div>
 </template>
 
@@ -208,8 +216,11 @@ import {
 import { notification } from 'src/boot/notification';
 import { useUserStore } from 'src/stores/userStore';
 import { usePetStore } from 'src/stores/petStore';
+import { useReminderStore } from 'src/stores/reminderStore';
 import MediaUploader from 'src/components/MediaUploader.vue';
+import NotificationConfirmDialog from 'src/components/notifications/NotificationConfirmDialog.vue';
 import { uploadMediaFiles, getCleanMediaFiles } from 'src/services/mediaUploadService';
+import { REMINDER_TAGS, TAG_TO_TYPE } from 'src/services/reminderConstants';
 import { cacheGet, cacheSet } from 'src/utils/idbCache';
 
 const props = defineProps({
@@ -221,7 +232,14 @@ const emit = defineEmits(['saved']);
 
 const userStore    = useUserStore();
 const petStore     = usePetStore();
+const reminderStore = useReminderStore();
 const router       = useRouter();
+
+// ── Notification confirm dialog state ──
+const showNotifConfirm = ref(false);
+const notifCandidates  = ref([]); // [{ tag, type }]
+const notifDueDate     = ref('');
+const pendingNotifContext = ref(null); // { recordId, petId, dueDate, notes }
 
 // ── Calorie params: pet.foodCalories overrides family.* ──
 const currentPet = computed(() => petStore.pets.find((p) => p.id === props.petId) || null);
@@ -420,6 +438,87 @@ const formatDate = (date) => {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
+// ── Reminder sync ──
+const todayDateString = () => formatDate(new Date());
+
+/**
+ * After a successful daily record save, reconcile reminders:
+ *   - Remove reminders whose tag was removed from the record
+ *   - Surface confirm dialog for newly added reminder tags on future/today dates
+ */
+const syncRemindersForRecord = async (recordId, dateString, currentTags) => {
+  if (!userStore.hasFamily) return;
+
+  // Ensure store has the latest reminders for this pet
+  if (reminderStore.findBySourceRecordId(recordId).length === 0) {
+    await reminderStore.loadPetReminders(props.petId);
+  }
+
+  const existing = reminderStore.findBySourceRecordId(recordId);
+  const desiredTypes = new Set(
+    (currentTags || [])
+      .filter((t) => REMINDER_TAGS.includes(t))
+      .map((t) => TAG_TO_TYPE[t]),
+  );
+
+  // Remove reminders whose tag is no longer present
+  for (const r of existing) {
+    if (!desiredTypes.has(r.type)) {
+      await reminderStore.removeReminder(r.id).catch(() => {});
+    }
+  }
+
+  // Don't ask about past dates
+  if (dateString < todayDateString()) return;
+
+  // Find reminder-tags that don't yet have a corresponding reminder
+  const existingTypes = new Set(existing.map((r) => r.type));
+  const candidates = [];
+  for (const tag of currentTags || []) {
+    if (!REMINDER_TAGS.includes(tag)) continue;
+    const type = TAG_TO_TYPE[tag];
+    if (existingTypes.has(type)) continue;
+    candidates.push({ tag, type });
+  }
+
+  if (candidates.length === 0) return;
+
+  notifCandidates.value = candidates;
+  notifDueDate.value = dateString;
+  pendingNotifContext.value = {
+    recordId,
+    petId: props.petId,
+    dueDate: dateString,
+    notes: formData.notes || '',
+  };
+  showNotifConfirm.value = true;
+};
+
+const handleConfirmNotification = async (candidates) => {
+  const ctx = pendingNotifContext.value;
+  if (!ctx) return;
+  try {
+    for (const { tag, type } of candidates) {
+      await reminderStore.addReminder({
+        petId: ctx.petId,
+        type,
+        title: ctx.notes?.trim() || `${tag}提醒`,
+        note: ctx.notes,
+        dueDate: ctx.dueDate,
+        timezone: 'Asia/Taipei',
+        offsets: [-1, 0],
+        sourceRecordId: ctx.recordId,
+      });
+    }
+    notification.success('已設置通知');
+  } catch (err) {
+    console.error('Failed to create reminders:', err);
+    notification.error('設置通知失敗');
+  } finally {
+    pendingNotifContext.value = null;
+  }
+};
+
 // ── Save ──
 const saveRecord = async () => {
   if (!userStore.isLoggedIn || !userStore.hasFamily || !props.petId) {
@@ -518,6 +617,11 @@ const saveRecord = async () => {
 
     if (formData.mediaFiles.some(f => f.loadError)) notification.warning('記錄已儲存，但部分媒體文件上傳失敗');
     else notification.success('記錄已儲存');
+
+    // Sync reminders with daily record tags
+    await syncRemindersForRecord(recordId, dateString, formData.tags || []).catch((err) => {
+      console.warn('syncRemindersForRecord failed:', err);
+    });
 
     emit('saved', {
       date: props.selectedDate, hasRecord: true,

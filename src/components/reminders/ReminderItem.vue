@@ -32,7 +32,7 @@
         <q-icon name="check_circle_outline" style="font-size: 16px;" />
         完成
       </button>
-      <button class="action-btn" @click="$emit('edit', reminder)" title="編輯">
+      <button v-if="!readOnly" class="action-btn" @click="$emit('edit', reminder)" title="編輯">
         <q-icon name="edit" style="font-size: 15px;" />
       </button>
       <button class="action-btn" @click="$emit('toggle', reminder)" :title="reminder.enabled ? '停用' : '啟用'">
@@ -55,6 +55,7 @@ import { computed } from 'vue'
 
 const props = defineProps({
   reminder: { type: Object, required: true },
+  readOnly: { type: Boolean, default: false },
 })
 
 defineEmits(['edit', 'complete', 'toggle', 'delete'])

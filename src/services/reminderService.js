@@ -29,6 +29,7 @@ export const createReminder = async (familyId, userId, data) => {
     offsets: data.offsets ?? [-1, 0],
     enabled: true,
     completedAt: null,
+    sourceRecordId: data.sourceRecordId || null,
     createdBy: userId,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

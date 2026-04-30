@@ -146,6 +146,12 @@ export const useReminderStore = defineStore('reminder', () => {
     }
   }
 
+  /**
+   * Find reminders that were auto-created from a given daily record.
+   */
+  const findBySourceRecordId = (sourceRecordId) =>
+    reminders.value.filter((r) => r.sourceRecordId === sourceRecordId)
+
   return {
     reminders,
     loading,
@@ -156,5 +162,6 @@ export const useReminderStore = defineStore('reminder', () => {
     turnOffReminder,
     markComplete,
     removeReminder,
+    findBySourceRecordId,
   }
 })

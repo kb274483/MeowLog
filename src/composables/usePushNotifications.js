@@ -1,15 +1,6 @@
 import { ref, computed } from 'vue'
-import {
-  getMessagingIfSupported,
-  getToken,
-  onMessage,
-  VAPID_KEY,
-} from 'src/boot/firebase'
-import {
-  savePushToken,
-  disablePushToken,
-  touchPushToken,
-} from 'src/services/pushTokenService'
+import { getMessagingIfSupported, getToken, onMessage, VAPID_KEY } from 'src/boot/firebase'
+import { savePushToken, disablePushToken, touchPushToken } from 'src/services/pushTokenService'
 
 const STATE_KEY = 'notificationOptInState'
 const DISMISSED_AT_KEY = 'notificationOptInDismissedAt'
@@ -40,8 +31,7 @@ const recentlyDismissed = () => {
 }
 
 const isStandalone = () =>
-  window.matchMedia('(display-mode: standalone)').matches ||
-  window.navigator.standalone === true
+  window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
 
 const browserPermission = () => {
   if (typeof Notification === 'undefined') return 'unsupported'
@@ -71,6 +61,21 @@ export function usePushNotifications() {
   }
 
   /**
+   * iOS PWA 偶爾把 SW context 重置，造成 navigator.serviceWorker.ready 永遠 pending。
+   * 策略：給 .ready 設 10 秒 timeout；超時就改用 getRegistration() 拿到（即使不是 active 狀態的）
+   * SW 物件，FCM SDK 還是能用它註冊 push subscription。
+   */
+  const swReadyOrFallback = async (timeoutMs = 10000) => {
+    const ready = navigator.serviceWorker.ready.catch(() => undefined)
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs))
+    const winner = await Promise.race([ready, timeout])
+    if (winner) return winner
+    // .ready timed out — fall back to whatever registration we have right now
+    console.warn('[push] SW.ready timed out; falling back to getRegistration()')
+    return await navigator.serviceWorker.getRegistration().catch(() => undefined)
+  }
+
+  /**
    * 嘗試取得並儲存 FCM token。需在使用者點擊後呼叫。
    * 回傳 token；失敗則 throw。
    */
@@ -85,18 +90,16 @@ export function usePushNotifications() {
     if (permission !== 'granted') {
       setOptInState(permission === 'denied' ? 'denied' : 'pending')
       throw new Error(
-        permission === 'denied'
-          ? '通知權限已被拒絕，請到瀏覽器設定中開啟'
-          : '尚未允許通知',
+        permission === 'denied' ? '通知權限已被拒絕，請到瀏覽器設定中開啟' : '尚未允許通知',
       )
     }
 
     const messaging = await ensureMessaging()
-    const swRegistration = await navigator.serviceWorker.ready
+    const swRegistration = await swReadyOrFallback()
 
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: swRegistration,
+      ...(swRegistration ? { serviceWorkerRegistration: swRegistration } : {}),
     })
 
     if (!token) {
@@ -119,10 +122,10 @@ export function usePushNotifications() {
 
     try {
       const messaging = await ensureMessaging()
-      const swRegistration = await navigator.serviceWorker.ready
+      const swRegistration = await swReadyOrFallback()
       const token = await getToken(messaging, {
         vapidKey: VAPID_KEY,
-        serviceWorkerRegistration: swRegistration,
+        ...(swRegistration ? { serviceWorkerRegistration: swRegistration } : {}),
       })
       if (!token) return null
 

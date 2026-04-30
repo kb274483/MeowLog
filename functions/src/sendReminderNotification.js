@@ -4,7 +4,14 @@ const { logger } = require('firebase-functions')
 const { FieldValue } = require('firebase-admin/firestore')
 const { getMessaging } = require('firebase-admin/messaging')
 
-const TYPE_LABELS = { vet: '看診', deworm: '驅蟲', vaccine: '疫苗' }
+const TYPE_LABELS = {
+  vet: '看診',
+  deworm: '驅蟲',
+  vaccine: '疫苗',
+  bath: '洗澡',
+  grooming: '美容',
+  other: '提醒',
+}
 
 // Set APP_DOMAIN in Firebase Functions environment:
 //   firebase functions:secrets:set APP_DOMAIN

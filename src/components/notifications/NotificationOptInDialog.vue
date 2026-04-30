@@ -9,11 +9,11 @@
 
       <q-card-section class="q-pt-none">
         <p>
-          開啟通知後，當毛孩有回診、驅蟲或疫苗提醒時，Meow Log
+          開啟通知後，當毛孩有日曆標記的提醒事項時，Meow Log
           會主動通知你和家人。
         </p>
         <ul class="benefit-list">
-          <li>回診前一天提醒，避免忘記</li>
+          <li>前一天和當天早上 10 點提醒</li>
           <li>家庭成員都會收到</li>
           <li>可隨時在設定中關閉</li>
         </ul>

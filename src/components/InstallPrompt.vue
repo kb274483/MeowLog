@@ -9,7 +9,7 @@
 
       <q-card-section class="q-pt-none">
         <template v-if="isIOS">
-          <p>把 Meow Log 加到主畫面，才能收到回診、驅蟲、疫苗的提醒通知喔！</p>
+          <p>把 Meow Log 加到主畫面，才能收到日曆標記的提醒通知喔！</p>
           <ol class="ios-steps">
             <li>
               點選 Safari 下方的

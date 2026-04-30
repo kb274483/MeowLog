@@ -61,9 +61,12 @@ const props = defineProps({
 defineEmits(['edit', 'complete', 'toggle', 'delete'])
 
 const typeConfig = {
-  vet:     { label: '看診', icon: '🏥' },
-  deworm:  { label: '驅蟲', icon: '🐛' },
-  vaccine: { label: '疫苗', icon: '💉' },
+  vet:      { label: '看診', icon: '🏥' },
+  deworm:   { label: '驅蟲', icon: '🐛' },
+  vaccine:  { label: '疫苗', icon: '💉' },
+  bath:     { label: '洗澡', icon: '🛁' },
+  grooming: { label: '美容', icon: '✂️' },
+  other:    { label: '提醒', icon: '📌' },
 }
 
 const isCompleted = computed(() => !!props.reminder.completedAt)

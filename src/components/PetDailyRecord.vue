@@ -278,7 +278,7 @@ const applySteppersFromFormData = () => {
   diarrheaCount.value = formData.hasDiarrhea ? (formData.diarrheaCount || 1) : 0;
 };
 
-const dailyTags = ref(['回診', '疫苗', '驅蟲', '洗澡', '美容', '其他'])
+const dailyTags = ref([...REMINDER_TAGS])
 
 // ── Form data ──
 const formData = reactive({

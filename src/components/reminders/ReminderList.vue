@@ -30,7 +30,7 @@
     <!-- Empty state -->
     <div v-else class="reminder-list__empty">
       <q-icon name="event_available" style="font-size: 32px; color: var(--ml-text-muted)" />
-      <p>標記回診、疫苗或驅蟲時可設置通知</p>
+      <p>在日曆上標記事項時，可選擇是否開啟通知</p>
     </div>
 
     <!-- Completed section toggle -->

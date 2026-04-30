@@ -149,6 +149,12 @@
         @saved="handleRecordSaved"
       />
 
+      <!-- Reminders -->
+      <reminder-list
+        :pet-id="pet.id"
+        :pet-name="pet.name"
+      />
+
       <!-- ── Export Dialog ── -->
       <pet-export-dialog
         v-if="showExportDialog"
@@ -177,6 +183,7 @@ import { useUserStore } from 'src/stores/userStore';
 import { notification } from 'src/boot/notification';
 import PetDailyRecord from 'src/components/PetDailyRecord.vue';
 import PetDataChartDialog from 'src/components/PetDataChartDialog.vue';
+import ReminderList from 'src/components/reminders/ReminderList.vue';
 const PetExportDialog = defineAsyncComponent(() => import('src/components/PetExportDialog.vue'));
 import { db, collection, query, where, getDocs, doc, getDoc } from 'src/boot/firebase';
 import { orderBy } from 'firebase/firestore';
